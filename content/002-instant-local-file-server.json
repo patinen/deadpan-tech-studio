@@ -1,105 +1,56 @@
 {
   "id": "002-instant-local-file-server",
   "title": "Turn Any Folder Into a Local Website",
-  "description": "Use Python's built-in HTTP server to preview or share a folder on a trusted local network.",
-  "hook": "This folder can become a local website with one command.",
-  "sources": [
-    "https://docs.python.org/3/library/http.server.html"
-  ],
+  "description": "Use Python's built-in HTTP server on 127.0.0.1 for a localhost-only preview, with an explicit note about deliberate LAN access.",
+  "hook": "This folder can become a localhost-only website with one command.",
+  "sources": ["https://docs.python.org/3/library/http.server.html"],
   "production": {
-    "preset": "production",
-    "template": "terminal_explainer",
-    "caption_emphasis": ["one command", "Python", "localhost", "trusted network", "Control C"],
-    "narration": {
-      "engine": "piper",
-      "voice": "en_US-lessac-medium",
-      "speed": 158,
-      "model": "models/en_US-lessac-medium.onnx",
-      "pronunciations": {
-        "localhost": "local host"
-      }
-    }
+    "preset": "production", "capture": "http_server", "template": "terminal_explainer",
+    "caption_emphasis": ["localhost-only", "127.0.0.1", "real captured page", "bind flag", "Control C"],
+    "narration": {"engine": "piper", "voice": "en_US-lessac-medium", "speed": 168,
+      "model": "models/en_US-lessac-medium.onnx", "pronunciations": {"localhost": "local host"}}
   },
   "scenes": [
     {
-      "kind": "hook",
-      "headline": "A WEBSITE. ONE COMMAND.",
-      "narration": "This folder can become a local website with one command. No upload. No account. No dashboard with fourteen tabs.",
-      "caption": "Serve a folder locally.",
-      "asset": null,
-      "duration": 7,
-      "visual": {
-        "template": "local_demo",
-        "mode": "terminal",
-        "prompt": "C:\\project>",
-        "command": "python -m http.server",
-        "result": "Serving on port 8000"
-      }
+      "kind": "hook", "headline": "A REAL LOCAL WEBSITE",
+      "narration": "Turn this folder into a localhost-only website with one command. No upload, account, or ceremonial dashboard.",
+      "caption": "A real server. Local only.",
+      "asset": "cache/002-instant-local-file-server/capture/server-start-real.mp4", "duration": 6,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "callouts": [
+        {"start": 2.2, "end": 5.8, "text": "BOUND TO 127.0.0.1", "position": "top"}]}
     },
     {
-      "kind": "problem",
-      "headline": "SKIP THE UPLOAD LOOP",
-      "narration": "Open a terminal inside the folder you want to share. Python already includes the small server we need.",
-      "caption": "Use the folder you intend to share.",
-      "asset": null,
-      "duration": 7,
-      "visual": {
-        "template": "local_demo",
-        "mode": "terminal",
-        "prompt": "C:\\project>",
-        "command": "python -m http.server",
-        "result": "HTTP server ready"
-      }
+      "kind": "problem", "headline": "BIND IT TO LOCALHOST",
+      "narration": "In a harmless test folder, run the command shown. The bind flag restricts the server to 127 dot 0 dot 0 dot 1: this machine only.",
+      "caption": "Bind explicitly to localhost.",
+      "asset": "cache/002-instant-local-file-server/capture/server-start-real.mp4", "duration": 7,
+      "visual": {"layout": "focus"}, "edit": {"motion": "punch_in", "asset_start": 0.7, "callouts": [
+        {"start": 1.0, "end": 6.8, "text": "python -m http.server 8000 --bind 127.0.0.1", "position": "bottom"}]}
     },
     {
-      "kind": "demo",
-      "headline": "LOCALHOST:8000",
-      "narration": "Run the command on screen. Then open localhost colon eight thousand in your browser. Your files appear as a simple local site.",
-      "caption": "localhost:8000",
-      "asset": null,
-      "duration": 9,
-      "visual": {
-        "template": "local_demo",
-        "mode": "browser",
-        "address": "localhost:8000",
-        "title": "PROJECT FILES",
-        "items": ["index.html", "prototype.css", "assets/"]
-      }
+      "kind": "demo", "headline": "LOCALHOST:8000",
+      "narration": "Open localhost colon eight thousand. This real captured page came from that folder, and the button works normally.",
+      "caption": "localhost:8000 — actually running",
+      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 7,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "callouts": [
+        {"start": 0.5, "end": 3.0, "text": "REAL PLAYWRIGHT CAPTURE", "position": "top"}]}
     },
     {
-      "kind": "comparison",
-      "headline": "KEEP IT TRUSTED",
-      "narration": "Use this on a trusted network, and only serve files you mean to expose. It is a convenience tool, not a security strategy.",
-      "caption": "Trusted network. Intended files only.",
-      "asset": null,
-      "duration": 7,
-      "visual": {
-        "template": "local_demo",
-        "mode": "terminal",
-        "prompt": "C:\\safe-demo>",
-        "command": "python -m http.server",
-        "result": "Share deliberately"
-      }
+      "kind": "comparison", "headline": "LOCAL IS NOT LAN",
+      "narration": "Remove the bind flag only when you deliberately want LAN access. Other devices may connect, so serve only safe files.",
+      "caption": "LAN access should be deliberate.",
+      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 7,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "asset_start": 4.0, "callouts": [
+        {"start": 0.6, "end": 6.8, "text": "LOCALHOST ≠ YOUR WHOLE NETWORK", "position": "bottom"}]}
     },
     {
-      "kind": "payoff",
-      "headline": "DONE? PRESS CONTROL C.",
-      "narration": "Press Control C when you are done. A useful server that also understands when to leave. Rare software manners.",
-      "caption": "Start fast. Stop cleanly.",
-      "asset": null,
-      "duration": 6,
-      "visual": {
-        "template": "local_demo",
-        "mode": "terminal",
-        "prompt": "C:\\project>",
-        "command": "Control C",
-        "result": "Server stopped"
-      }
+      "kind": "payoff", "headline": "DONE? CONTROL C.",
+      "narration": "Press Control C when finished. The captured process stops cleanly. Software that understands when to leave. Remarkable.",
+      "caption": "Start locally. Stop cleanly.",
+      "asset": "cache/002-instant-local-file-server/capture/server-stop-real.mp4", "duration": 6,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "callouts": [
+        {"start": 2.0, "end": 5.8, "text": "PROCESS EXITED", "position": "top"}]}
     }
   ],
-  "review": {
-    "facts_checked": false,
-    "assets_licensed": false,
-    "final_approved": false
-  }
+  "review": {"facts_checked": false, "assets_licensed": false, "final_approved": false}
 }

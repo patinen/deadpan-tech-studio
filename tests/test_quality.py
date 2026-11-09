@@ -94,14 +94,13 @@ class PipelineTests(unittest.TestCase):
             ))
             self.assertEqual(refreshed["scenes"][0]["duration"], measured[0])
 
-    def test_task_02_project_is_backward_compatible_and_uses_local_demo(self):
+    def test_task_02_project_remains_valid_after_real_capture_upgrade(self):
         project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
         errors, warnings = check(project)
         self.assertFalse(errors)
-        self.assertTrue(all(scene["visual"]["template"] == "local_demo"
+        self.assertTrue(all(scene["visual"]["layout"] == "focus"
                             for scene in project["scenes"]))
-        self.assertFalse(any("No real footage" in warning for warning in warnings))
-        self.assertTrue(any("human verification" in warning for warning in warnings))
+        self.assertTrue(any("capture" in warning.lower() for warning in warnings))
 
     def test_project_narration_configuration_and_cli_override(self):
         project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())

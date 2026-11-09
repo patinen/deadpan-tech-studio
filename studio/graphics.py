@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 W, H = 540, 960
 PANEL = (39, 329, 501, 702)
+FOCUS_PANEL = (16, 150, 524, 800)
 BG = (12, 15, 22)
 LIME = (201, 244, 87)
 PAPER = (244, 244, 237)
@@ -135,6 +136,22 @@ def build_frame(scene: dict, number: int, count: int, brand: str | None = None,
             pix[x,y] = (BG[0]+v, BG[1]+v, BG[2]+v)
     d = ImageDraw.Draw(img)
     d.rectangle((0,0, W,13), fill=LIME)
+    if scene.get("visual", {}).get("layout") == "focus":
+        d.rounded_rectangle((24, 35, 67, 79), radius=9, fill=LIME)
+        d.text((36, 45), "D/", font=font(23, True), fill=BG)
+        d.text((80, 44), brand[:24].upper(), font=font(18, True), fill=PAPER)
+        d.text((450, 46), f"{number:02d}/{count:02d}", font=font(14, True), fill=MUTED)
+        headline = scene.get("headline", "DEMONSTRATION").upper()
+        size = 38 if len(headline) <= 22 else 31
+        text_lines(d, (24, 92), headline, font(size, True), PAPER, 492,
+                   line_height=int(size*1.05), max_lines=2)
+        d.rounded_rectangle(FOCUS_PANEL, radius=18, fill=(18, 23, 30),
+                            outline=(75, 88, 80), width=2)
+        d.line((24, 885, 516, 885), fill=(67, 75, 72), width=2)
+        status = "DRAFT · NOT APPROVED" if draft else "ORIGINAL TECH EXPLAINERS"
+        d.text((24, 902), status, font=font(13, True), fill=CORAL if draft else MUTED)
+        d.text((458, 902), "9:16", font=font(13, True), fill=MUTED)
+        return img
     # offset tech stripes
     for i in range(6):
         x= W-185+i*47

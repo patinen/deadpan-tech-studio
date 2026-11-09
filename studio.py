@@ -13,6 +13,7 @@ from studio.render import render
 from studio.speech import make_voice
 from studio.utils import ROOT, load_project, slugify
 from studio.writer import create_script
+from studio.capture import capture_http_server_demo
 
 
 def load_env():
@@ -36,6 +37,8 @@ def main():
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
+    c = sub.add_parser("capture", help="Generate authentic local demo recordings")
+    c.add_argument("project")
     v = sub.add_parser("voice", help="Narrate each scene (espeak/sapi/edge/piper)")
     v.add_argument("project")
     v.add_argument("--engine", choices=["espeak", "sapi", "piper", "edge"], default=None)
@@ -54,6 +57,7 @@ def main():
     b.add_argument("--output", default=None)
     b.add_argument("--preset", choices=["draft", "production"], default=None)
     b.add_argument("--subtitles", default=None, help="Editable subtitle timing JSON path")
+    b.add_argument("--capture", action="store_true", help="Capture configured real demo first")
     args = p.parse_args()
     try:
         if args.cmd == "generate":
@@ -80,6 +84,13 @@ def main():
             return 1
         if args.cmd == "review":
             print("Draft schema OK" if not args.strict else "Ready for publishing (review flags confirmed)")
+        if args.cmd == "capture" or (args.cmd == "build" and args.capture):
+            capture_type = project.get("production", {}).get("capture")
+            if capture_type != "http_server":
+                raise ValueError("Project does not configure production.capture='http_server'")
+            evidence = capture_http_server_demo(project)
+            print("Captured real local demo:", evidence["url"])
+            print("Capture assets:", ", ".join(evidence["assets"].values()))
         if args.cmd in {"voice", "build"}:
             for voice_path in make_voice(project, engine=args.engine,
                                          speed=getattr(args, "speed", None),
