@@ -126,12 +126,41 @@ class CaptureTests(unittest.TestCase):
         self.assertFalse(errors)
         self.assertTrue(any("capture" in warning.lower() for warning in warnings))
 
+    def test_sample_is_audience_first_and_result_led(self):
+        project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
+        self.assertGreaterEqual(sum(scene["duration"] for scene in project["scenes"]), 20)
+        self.assertLessEqual(sum(scene["duration"] for scene in project["scenes"]), 28)
+        hook = project["scenes"][0]
+        self.assertTrue(hook["asset"].endswith("browser-real.mp4"))
+        self.assertGreaterEqual(hook["edit"]["asset_start"], 2.0)
+        self.assertGreater(hook["edit"]["zoom"], 1.0)
+
     def test_callouts_must_fit_inside_scene(self):
         project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
         invalid = copy.deepcopy(project)
         invalid["scenes"][0]["edit"]["callouts"][0]["end"] = 99
         errors, _ = check(invalid)
         self.assertTrue(any("callout timing" in error for error in errors))
+
+    def test_task_05_projects_use_reusable_verified_recipes(self):
+        projects = [json.loads((ROOT / "content" / name).read_text(encoding="utf-8")) for name in (
+            "003-paste-without-formatting.json", "004-local-ai-voice.json",
+            "005-batch-rename-files.json")]
+        self.assertEqual({project["production"]["capture_plan"]["type"] for project in projects},
+                         {"browser", "command"})
+        for project in projects:
+            self.assertEqual(project["production"]["capture"], "recipe")
+            self.assertTrue(project["sources"])
+            self.assertTrue(20 <= sum(scene["duration"] for scene in project["scenes"]) <= 30)
+            self.assertFalse(any(project["review"].values()))
+            self.assertGreater(len({scene.get("visual", {}).get("layout", "inset")
+                                    for scene in project["scenes"]}), 1)
+
+    def test_browser_recipe_requires_plain_text_result(self):
+        project = json.loads((ROOT / "content" / "003-paste-without-formatting.json").read_text())
+        assertion = project["production"]["capture_plan"]["assertions"][0]
+        self.assertTrue(assertion["plain_text"])
+        self.assertEqual(assertion["text"], "Quarterly plan \u2014 review Friday")
 
 
 if __name__ == "__main__":

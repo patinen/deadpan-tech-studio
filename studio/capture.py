@@ -238,7 +238,7 @@ def capture_http_server_demo(project: dict) -> dict:
         exit_code, forced_stop = _stop_process(server)
     stop_clip = _make_terminal_clip(work, "server-stop-real", [
         (1.5, [f"$ {command_display}", "^C"]),
-        (2.8, [f"$ {command_display}", "^C", stop_transcript(exit_code, forced_stop), "$ "]),
+        (4.5, [f"$ {command_display}", "^C", stop_transcript(exit_code, forced_stop), "$ "]),
     ])
     if server.poll() is None:
         raise RuntimeError("Demo server remained running after capture")

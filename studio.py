@@ -15,6 +15,7 @@ from studio.utils import ROOT, load_project, slugify
 from studio.writer import create_script
 from studio.capture import capture_http_server_demo
 from studio.visual_qa import generate_contact_sheet
+from studio.recipe_capture import capture_recipe
 
 
 def load_env():
@@ -90,11 +91,15 @@ def main():
             print("Draft schema OK" if not args.strict else "Ready for publishing (review flags confirmed)")
         if args.cmd == "capture" or (args.cmd == "build" and args.capture):
             capture_type = project.get("production", {}).get("capture")
-            if capture_type != "http_server":
-                raise ValueError("Project does not configure production.capture='http_server'")
-            evidence = capture_http_server_demo(project)
-            print("Captured real local demo:", evidence["url"])
-            print("Capture assets:", ", ".join(evidence["assets"].values()))
+            if capture_type == "http_server":
+                evidence = capture_http_server_demo(project)
+                print("Captured real local demo:", evidence["url"])
+                print("Capture assets:", ", ".join(evidence["assets"].values()))
+            elif capture_type == "recipe":
+                evidence = capture_recipe(project)
+                print("Captured verified recipe:", evidence["asset"])
+            else:
+                raise ValueError("Project production.capture must be 'http_server' or 'recipe'")
         if args.cmd == "visual-qa":
             video = (Path(args.video).resolve() if args.video else
                      ROOT / "output" / f"{slugify(project['id'])}.mp4")

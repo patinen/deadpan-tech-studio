@@ -138,6 +138,49 @@ Generated fixture files, recordings, evidence, narration, subtitle timing, rende
 
 Scenes with `visual.layout: "focus"` give the authentic recording most of the portrait canvas. Optional `edit.asset_start`, `edit.motion`, and timed `edit.callouts` provide deliberate cuts and short emphasis without applying a constant zoom to every scene. Existing projects without these fields retain the original inset layout.
 
+The audience-first sample is a 20–28 second narration-led edit that opens on the
+already revealed browser result, then cuts back to the command and shows the real
+button interaction. Optional `edit.zoom`, `edit.focus_x`, and `edit.focus_y`
+provide a static focal crop for phone readability. Values are deliberately
+scene-specific; projects that omit them retain their existing framing.
+
+## Task 05 reusable capture recipes
+
+Projects 003–005 demonstrate two reusable, local-first capture primitives:
+
+- `production.capture_plan.type: "browser"` opens a committed harmless fixture in
+  real Chromium, executes declarative click/keyboard/select steps, and fails when
+  declared DOM assertions are not satisfied.
+- `production.capture_plan.type: "command"` copies a committed fixture into an
+  isolated cache folder, runs argument-array commands without a shell, verifies
+  expected files, and records observed before/after output.
+
+Run any recipe-backed project with the same commands:
+
+```powershell
+python studio.py capture content/003-paste-without-formatting.json
+python studio.py build content/003-paste-without-formatting.json
+```
+
+The three samples cover plain-text browser paste, local Piper neural speech, and
+selective batch renaming. Their fixtures, scripts, sources, narration and review
+flags are editable JSON/repository files; recordings, generated WAV files,
+models, MP4s, contact sheets and evidence manifests remain ignored. Command
+recipes are trusted repository configuration and must be reviewed before use.
+
+Task 05.1 adds three reusable content-aware compositions: `browser_demo`,
+`audio_demo`, and `automation_demo`. Their demo panels move down when a headline
+wraps, preventing long titles from colliding with footage. Production subtitles
+are measured with the configured font, receive explicit ASS line breaks, and use
+96-pixel left/right margins at 1080x1920.
+
+A scene may play a verified generated result with optional `edit.result_audio`,
+`result_audio_start`, `result_audio_duration`, and `result_audio_volume`. The
+excerpt is trimmed, delayed, and mixed with narration; projects without these
+fields preserve the previous audio path. Project 004 uses this to play the WAV
+that its capture recipe actually generated. Missing or unsupported result audio
+fails the render rather than silently substituting another sound.
+
 ### Linux / Server
 
 ```bash

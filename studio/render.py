@@ -4,17 +4,40 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from .graphics import FOCUS_PANEL, PANEL, W, H, build_frame, paste_still
+from .graphics import FOCUS_LAYOUTS, PANEL, W, H, build_frame, paste_still, scene_panel
 from .subtitles import load_or_create_manifest, write_ass, write_callouts_ass
 from .quality import check
 from .utils import ROOT, assert_tool, duration_seconds, run, slugify
 
 STILL_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm"}
+AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg"}
 PRESETS = {
     "draft": {"width": 540, "height": 960, "crf": 23, "encoder_preset": "veryfast"},
     "production": {"width": 1080, "height": 1920, "crf": 19, "encoder_preset": "medium"},
 }
+
+
+def focal_zoom_filter(edit: dict, width: int, height: int) -> str:
+    """Return a static, targeted crop; omitted settings preserve legacy framing."""
+    zoom = float(edit.get("zoom", 1.0))
+    if zoom <= 1.0:
+        return ""
+    focus_x = float(edit.get("focus_x", 0.5))
+    focus_y = float(edit.get("focus_y", 0.5))
+    x = f"min(max(iw*{focus_x:.3f}-iw/zoom/2,0),iw-iw/zoom)"
+    y = f"min(max(ih*{focus_y:.3f}-ih/zoom/2,0),ih-ih/zoom)"
+    return f",zoompan=z='{zoom:.3f}':x='{x}':y='{y}':d=1:s={width}x{height}:fps=30"
+
+
+def result_audio_filter(voice_index: int, result_index: int, edit: dict) -> str:
+    """Mix a bounded verified-result excerpt after/alongside narration."""
+    start_ms = round(float(edit.get("result_audio_start", 0)) * 1000)
+    duration = float(edit.get("result_audio_duration", 3.0))
+    volume = float(edit.get("result_audio_volume", 0.9))
+    return (f"[{voice_index}:a]apad[narr];[{result_index}:a]atrim=0:{duration:.3f},"
+            f"asetpts=PTS-STARTPTS,adelay={start_ms}|{start_ms},volume={volume:.3f}[result];"
+            "[narr][result]amix=inputs=2:duration=longest:dropout_transition=0,apad[mixed]")
 
 
 def ffmpeg_filter_path(path: Path) -> str:
@@ -78,6 +101,11 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
         requested_duration = float(scene.get("duration", 6))
         voice_duration = duration_seconds(voice) if voice else None
         duration = max(requested_duration, voice_duration + 0.40) if voice_duration else requested_duration
+        edit = scene.get("edit", {})
+        if edit.get("result_audio"):
+            result_end = (float(edit.get("result_audio_start", 0)) +
+                          float(edit.get("result_audio_duration", 3.0)) + 0.15)
+            duration = max(duration, result_end)
         voices.append(voice)
         actual_times.append(duration)
         subtitle_times.append(voice_duration + 0.20 if voice_duration else requested_duration)
@@ -89,9 +117,13 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
     )
     for idx, scene in enumerate(project["scenes"]):
         path = resolve_asset(scene.get("asset"), project_file)
+        edit = scene.get("edit", {})
+        result_audio = resolve_asset(edit.get("result_audio"), project_file)
         has_video = bool(path and path.suffix.lower() in VIDEO_EXTS)
         if path and path.suffix.lower() not in VIDEO_EXTS | STILL_EXTS:
             raise ValueError(f"Unsupported media type: {path.suffix}")
+        if result_audio and result_audio.suffix.lower() not in AUDIO_EXTS:
+            raise ValueError(f"Unsupported result audio type: {result_audio.suffix}")
         if not path and scene.get("visual", {}).get("template") != "local_demo":
             warnings.append(f"Scene {idx+1}: placeholder art instead of a recorded demo")
         elif not path:
@@ -130,10 +162,14 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
             cmd += ["-i", str(voice)]
         else:
             cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+        voice_index = 2 if has_video else 1
+        result_index = voice_index + 1
+        if result_audio:
+            cmd += ["-i", str(result_audio)]
         if has_video:
             scale = config["width"] / W
-            focus = scene.get("visual", {}).get("layout") == "focus"
-            panel = FOCUS_PANEL if focus else PANEL
+            focus = scene.get("visual", {}).get("layout") in FOCUS_LAYOUTS
+            panel = scene_panel(scene) if focus else PANEL
             x1, y1, x2, y2 = [round(value * scale) for value in panel]
             inset = round((8 if focus else 14) * scale)
             insert_w, insert_h = x2-x1-2*inset, y2-y1-2*inset
@@ -141,6 +177,7 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
             if focus:
                 insert = (f"[1:v]scale={insert_w}:{insert_h}:force_original_aspect_ratio=increase,"
                           f"crop={insert_w}:{insert_h},fps=30,setsar=1")
+                insert += focal_zoom_filter(scene.get("edit", {}), insert_w, insert_h)
                 if scene.get("edit", {}).get("motion") == "punch_in":
                     insert += (f",zoompan=z='min(zoom+0.0007,1.035)':"
                                "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:"
@@ -154,15 +191,26 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
                         f"pad={insert_w}:{insert_h}:(ow-iw)/2:(oh-ih)/2:color=0x171d26,"
                         f"fps=30,setsar=1[insert];[base][insert]overlay={x}:{y}:shortest=0,"
                         f"ass='{callout_filter}',ass='{ass_filter}',format=yuv420p[v]")
-            cmd += ["-filter_complex", filt, "-map", "[v]", "-map", "2:a:0"]
+            if result_audio:
+                filt += ";" + result_audio_filter(voice_index, result_index, edit)
+                cmd += ["-filter_complex", filt, "-map", "[v]", "-map", "[mixed]"]
+            else:
+                cmd += ["-filter_complex", filt, "-map", "[v]", "-map", f"{voice_index}:a:0"]
         else:
-            cmd += ["-vf", f"{motion},ass='{callout_filter}',ass='{ass_filter}'",
-                    "-map", "0:v:0", "-map", "1:a:0"]
+            if result_audio:
+                filt = (f"[0:v]{motion},ass='{callout_filter}',ass='{ass_filter}',format=yuv420p[v];" +
+                        result_audio_filter(voice_index, result_index, edit))
+                cmd += ["-filter_complex", filt, "-map", "[v]", "-map", "[mixed]"]
+            else:
+                cmd += ["-vf", f"{motion},ass='{callout_filter}',ass='{ass_filter}'",
+                        "-map", "0:v:0", "-map", f"{voice_index}:a:0"]
         out = work / f"scene-{idx:02d}.mp4"
         cmd += ["-t", f"{duration:.3f}", "-r", "30", "-c:v", "libx264",
                 "-preset", config["encoder_preset"], "-crf", str(config["crf"]), "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k",
-                "-af", "apad", "-movflags", "+faststart", str(out)]
+                "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "128k"]
+        if not result_audio:
+            cmd += ["-af", "apad"]
+        cmd += ["-movflags", "+faststart", str(out)]
         run(cmd)
         scene_files.append(out)
     concat = work / "concat.txt"
@@ -187,6 +235,8 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
         "status": "approved" if approved else "draft", "preset": preset,
         "width": config["width"], "height": config["height"],
         "subtitle_manifest": str(subtitle_manifest), "narration": voice_info,
+        "result_audio_scenes": [index for index, scene in enumerate(project["scenes"])
+                                if scene.get("edit", {}).get("result_audio")],
         "capture_evidence": capture_evidence,
         "media": probe_media(output),
         "publication_ready": not blockers, "blockers": blockers,

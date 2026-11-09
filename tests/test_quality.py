@@ -1,19 +1,61 @@
 import copy
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
 from studio.quality import check
-from studio.render import PRESETS
+from studio.render import PRESETS, focal_zoom_filter, result_audio_filter
+from studio.graphics import scene_panel
 from studio.speech import narration_config
 from studio.subtitles import (build_manifest, group_phrases, load_or_create_manifest,
-                              validate_manifest)
+                              validate_manifest, wrap_ass_text, write_ass)
 from studio.utils import narr_hash, slugify
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class PipelineTests(unittest.TestCase):
+    def test_long_subtitle_wraps_inside_production_safe_width(self):
+        wrapped = wrap_ass_text(
+            "A deliberately long phrase that must remain readable on narrow mobile screens",
+            888, 58)
+        self.assertIn(r"\N", wrapped)
+        self.assertEqual(wrapped.replace(r"\N", " ").split(),
+                         "A deliberately long phrase that must remain readable on narrow mobile screens".split())
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "captions.ass"
+            write_ass(path, [{"start": 0, "end": 2, "text": wrapped.replace(r"\N", " ")}],
+                      1080, 1920)
+            ass = path.read_text(encoding="utf-8-sig")
+            self.assertIn("WrapStyle: 0", ass)
+            self.assertIn(",96,96,184,", ass)
+            self.assertIn(r"\N", ass)
+
+    def test_focal_zoom_is_optional_and_targets_configured_region(self):
+        self.assertEqual(focal_zoom_filter({}, 1000, 1200), "")
+        value = focal_zoom_filter({"zoom": 1.3, "focus_x": 0.25, "focus_y": 0.4},
+                                  1000, 1200)
+        self.assertIn("z='1.300'", value)
+        self.assertIn("iw*0.250", value)
+        self.assertIn("ih*0.400", value)
+
+    def test_long_focus_headline_moves_panel_below_text(self):
+        short_top = scene_panel({"headline": "SHORT", "visual": {"layout": "audio_demo"}})[1]
+        long_top = scene_panel({"headline": "NO HOSTED API REQUIRED",
+                                "visual": {"layout": "audio_demo"}})[1]
+        self.assertGreater(long_top, short_top)
+        self.assertGreaterEqual(long_top, 175)
+
+    def test_verified_result_audio_is_delayed_trimmed_and_mixed(self):
+        value = result_audio_filter(2, 3, {"result_audio_start": 2.5,
+                                           "result_audio_duration": 2.2,
+                                           "result_audio_volume": 0.8})
+        self.assertIn("atrim=0:2.200", value)
+        self.assertIn("adelay=2500|2500", value)
+        self.assertIn("volume=0.800", value)
+        self.assertIn("amix=inputs=2", value)
+
     def setUp(self):
         self.project = json.loads((ROOT / "content" / "001-stop-copy-pasting.json").read_text())
 
