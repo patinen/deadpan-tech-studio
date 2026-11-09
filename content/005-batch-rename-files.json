@@ -1,0 +1,19 @@
+{
+  "id":"005-batch-rename-files","title":"Rename a Folder of Files in One Run",
+  "description":"A real isolated before-and-after run renames matching files while leaving an unrelated note untouched.",
+  "hook":"Three chaotic filenames become an ordered set in one run.",
+  "sources":["https://docs.python.org/3/library/pathlib.html#pathlib.Path.rename"],
+  "production":{"preset":"production","capture":"recipe","caption_emphasis":["one run","matching files","notes.txt"],
+    "narration":{"engine":"piper","voice":"en_US-lessac-medium","speed":174,"model":"models/en_US-lessac-medium.onnx"},
+    "capture_plan":{"type":"command","fixture_dir":"fixtures/batch-rename","steps":[
+      {"type":"list","label":"Before","duration":4},
+      {"type":"run","label":"python rename.py","command":["{python}","rename.py"],"duration":4},
+      {"type":"list","label":"After","duration":7}
+    ]}},
+  "scenes":[
+    {"kind":"hook","headline":"BEFORE. AFTER. DONE.","narration":"These messy names become a numbered set in one real run. The result comes first.","caption":"Three files, renamed together.","asset":"cache/005-batch-rename-files/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":8.2,"zoom":1.2,"focus_y":0.38,"callouts":[{"start":0.2,"end":3.7,"text":"TRIP-01 TO TRIP-03","position":"bottom"}]}},
+    {"kind":"problem","headline":"THE BEFORE FOLDER","narration":"The isolated folder has three camera-style names, plus notes dot text, which must stay untouched.","caption":"Only matching files should change.","asset":"cache/005-batch-rename-files/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus_alt"},"edit":{"asset_start":0,"zoom":1.08,"focus_y":0.3}},
+    {"kind":"demo","headline":"RUN THE RENAME RULE","narration":"The script matches only IMG files, then numbers them in order. The captured process reports success.","caption":"Match narrowly. Rename predictably.","asset":"cache/005-batch-rename-files/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":3.8,"zoom":1.22,"focus_y":0.35,"callouts":[{"start":0.5,"end":4.7,"text":"ONLY IMG_* FILES","position":"bottom"}]}},
+    {"kind":"payoff","headline":"ORDER, WITHOUT CLICKING","narration":"The three targets changed. Notes dot text did not. Repetitive clicking has been reassigned to software.","caption":"The unrelated file remains.","asset":"cache/005-batch-rename-files/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":8,"zoom":1.2,"focus_y":0.42}}
+  ],"review":{"facts_checked":false,"assets_licensed":false,"final_approved":false}
+}

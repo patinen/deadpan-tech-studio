@@ -144,7 +144,7 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
             cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
         if has_video:
             scale = config["width"] / W
-            focus = scene.get("visual", {}).get("layout") == "focus"
+            focus = scene.get("visual", {}).get("layout") in {"focus", "focus_alt"}
             panel = FOCUS_PANEL if focus else PANEL
             x1, y1, x2, y2 = [round(value * scale) for value in panel]
             inset = round((8 if focus else 14) * scale)

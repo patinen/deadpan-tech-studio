@@ -55,7 +55,7 @@ def check(project: dict, require_approval: bool = False) -> tuple[list[str], lis
         combined = f"{scene.get('narration', '')} {scene.get('headline', '')}".lower()
         if any(phrase in combined for phrase in HYPE):
             warnings.append(f"Scene {i}: potential generic hype wording")
-        generated_capture = (project.get("production", {}).get("capture") == "http_server" and
+        generated_capture = (project.get("production", {}).get("capture") in {"http_server", "recipe"} and
                              str(scene.get("asset", "")).startswith("cache/"))
         if scene.get("asset") and not Path(scene["asset"]).is_absolute() and not generated_capture:
             warnings.append(f"Scene {i}: verify relative asset path resolves from project root")
@@ -88,4 +88,10 @@ def check(project: dict, require_approval: bool = False) -> tuple[list[str], lis
             warnings.append("Authentic demo capture is missing or stale: run studio.py capture <project>")
         else:
             warnings.append("Authentic local capture exists; human must still verify actions and framing")
+    if project.get("production", {}).get("capture") == "recipe":
+        manifest = ROOT / "cache" / slugify(project.get("id", "")) / "capture" / "capture-manifest.json"
+        if not manifest.is_file():
+            warnings.append("Verified recipe capture is missing: run studio.py capture <project>")
+        else:
+            warnings.append("Verified recipe capture exists; human must still verify actions and framing")
     return errors, warnings

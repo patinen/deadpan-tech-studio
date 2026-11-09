@@ -1,0 +1,30 @@
+{
+  "id": "003-paste-without-formatting",
+  "title": "Paste Text Without the Formatting Mess",
+  "description": "A real Chromium demonstration of pasting copied rich text as plain text with Ctrl+Shift+V.",
+  "hook": "Keep the words. Leave the surprise formatting behind.",
+  "sources": ["https://support.google.com/chrome/thread/364575601/"],
+  "production": {
+    "preset": "production", "capture": "recipe",
+    "caption_emphasis": ["Ctrl Shift V", "plain text", "same words"],
+    "narration": {"engine": "piper", "voice": "en_US-lessac-medium", "speed": 174,
+      "model": "models/en_US-lessac-medium.onnx"},
+    "capture_plan": {
+      "type": "browser", "fixture": "fixtures/plain-text-paste/index.html",
+      "actions": [
+        {"type": "wait", "ms": 1300}, {"type": "select_text", "selector": "#source"},
+        {"type": "wait", "ms": 700}, {"type": "press", "keys": "Control+c"},
+        {"type": "click", "selector": "#target"}, {"type": "wait", "ms": 700},
+        {"type": "press", "keys": "Control+Shift+v"}, {"type": "wait", "ms": 7000}
+      ],
+      "assertions": [{"selector": "#target", "text": "Quarterly plan \u2014 review Friday", "plain_text": true}]
+    }
+  },
+  "scenes": [
+    {"kind":"hook","headline":"SAME WORDS. NO MESS.","narration":"Here is the result: clean text, with none of the borrowed formatting.","caption":"Clean text immediately.","asset":"cache/003-paste-without-formatting/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":3.6,"zoom":1.18,"focus_y":0.55,"callouts":[{"start":0.2,"end":2.6,"text":"PLAIN TEXT","position":"top"}]}},
+    {"kind":"problem","headline":"COPY THE FORMATTED TEXT","narration":"Copy the styled text normally. This is where fonts usually begin their unauthorized field trip.","caption":"Copy as usual.","asset":"cache/003-paste-without-formatting/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus_alt"},"edit":{"asset_start":0.2,"zoom":1.08,"focus_y":0.34}},
+    {"kind":"demo","headline":"PASTE WITH CTRL SHIFT V","narration":"Click the destination, then press Control Shift V. Chromium pastes the words as plain text.","caption":"Ctrl Shift V pastes plain text.","asset":"cache/003-paste-without-formatting/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":1.8,"zoom":1.2,"focus_y":0.58,"callouts":[{"start":0.5,"end":4.6,"text":"CTRL + SHIFT + V","position":"bottom"}]}},
+    {"kind":"payoff","headline":"FORMATTING DECLINED","narration":"Same words. Your document keeps its own style. A small victory over collaborative typography.","caption":"Your formatting survives.","asset":"cache/003-paste-without-formatting/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":3.8,"zoom":1.24,"focus_y":0.58}}
+  ],
+  "review":{"facts_checked":false,"assets_licensed":false,"final_approved":false}
+}

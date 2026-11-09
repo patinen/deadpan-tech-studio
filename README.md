@@ -144,6 +144,30 @@ button interaction. Optional `edit.zoom`, `edit.focus_x`, and `edit.focus_y`
 provide a static focal crop for phone readability. Values are deliberately
 scene-specific; projects that omit them retain their existing framing.
 
+## Task 05 reusable capture recipes
+
+Projects 003–005 demonstrate two reusable, local-first capture primitives:
+
+- `production.capture_plan.type: "browser"` opens a committed harmless fixture in
+  real Chromium, executes declarative click/keyboard/select steps, and fails when
+  declared DOM assertions are not satisfied.
+- `production.capture_plan.type: "command"` copies a committed fixture into an
+  isolated cache folder, runs argument-array commands without a shell, verifies
+  expected files, and records observed before/after output.
+
+Run any recipe-backed project with the same commands:
+
+```powershell
+python studio.py capture content/003-paste-without-formatting.json
+python studio.py build content/003-paste-without-formatting.json
+```
+
+The three samples cover plain-text browser paste, local Piper neural speech, and
+selective batch renaming. Their fixtures, scripts, sources, narration and review
+flags are editable JSON/repository files; recordings, generated WAV files,
+models, MP4s, contact sheets and evidence manifests remain ignored. Command
+recipes are trusted repository configuration and must be reviewed before use.
+
 ### Linux / Server
 
 ```bash
