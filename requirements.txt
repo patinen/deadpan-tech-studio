@@ -1,0 +1,3 @@
+Pillow>=10.4,<13
+requests>=2.31,<3
+# Optional: pip install edge-tts to enable the 'edge' speech engine.

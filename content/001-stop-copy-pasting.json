@@ -1,0 +1,46 @@
+{
+  "id": "001-stop-copy-pasting",
+  "title": "Your Spreadsheet Is Not a Full-Time Job",
+  "description": "A tiny automation idea for moving repeatable data into a spreadsheet — without the usual copy-paste marathon.",
+  "hook": "Somehow, copying data into spreadsheets is still a job description.",
+  "sources": [],
+  "scenes": [
+    {
+      "kind": "hook",
+      "headline": "STILL COPYING DATA?",
+      "narration": "Somehow, copying data into spreadsheets is still a job description.",
+      "caption": "A very exciting career path.",
+      "asset": null,
+      "duration": 5
+    },
+    {
+      "kind": "problem",
+      "headline": "THE MANUAL METHOD",
+      "narration": "Open a file. Find a number. Copy it. Paste it. Repeat. Truly, the future we were promised.",
+      "caption": "Click. Copy. Paste. Regret.",
+      "asset": null,
+      "duration": 8
+    },
+    {
+      "kind": "demo",
+      "headline": "THE BETTER METHOD",
+      "narration": "For repeatable digital documents, a small script can extract the fields you need and write them to a sheet. Real files vary, so check the results.",
+      "caption": "Extract. Validate. Export.",
+      "asset": null,
+      "duration": 12
+    },
+    {
+      "kind": "payoff",
+      "headline": "LESS CLICKING. MORE LIVING.",
+      "narration": "Same boring data. Fewer boring clicks. A modest victory for civilization.",
+      "caption": "A modest victory for civilization.",
+      "asset": null,
+      "duration": 7
+    }
+  ],
+  "review": {
+    "facts_checked": false,
+    "assets_licensed": false,
+    "final_approved": false
+  }
+}
