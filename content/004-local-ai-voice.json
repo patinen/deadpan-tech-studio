@@ -1,0 +1,19 @@
+{
+  "id":"004-local-ai-voice","title":"Turn Text Into Speech Locally with Piper",
+  "description":"A verified local Piper run turns a sentence into a WAV file without sending the text to a hosted API.",
+  "hook":"This AI voice was generated locally from one sentence.",
+  "sources":["https://github.com/OHF-Voice/piper1-gpl","https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/CLI.md"],
+  "production":{"preset":"production","capture":"recipe","caption_emphasis":["generated locally","Piper","WAV file"],
+    "narration":{"engine":"piper","voice":"en_US-lessac-medium","speed":174,"model":"models/en_US-lessac-medium.onnx"},
+    "capture_plan":{"type":"command","fixture_dir":"fixtures/piper-voice","steps":[
+      {"type":"list","label":"Before: isolated folder","duration":2.5},
+      {"type":"run","label":"Piper: text to local-voice.wav","command":["piper","--model","{root}/models/en_US-lessac-medium.onnx","--output_file","{work}/local-voice.wav"],"stdin":"This voice was generated on this computer. No cloud account required.\n","verify_file":"local-voice.wav","timeout":30,"duration":5},
+      {"type":"list","label":"After: verified output","duration":7}
+    ]}},
+  "scenes":[
+    {"kind":"hook","headline":"TEXT IN. VOICE OUT.","narration":"This WAV file came from a local AI voice model. Here is the verified result.","caption":"A real local output file.","asset":"cache/004-local-ai-voice/capture/demo-real.mp4","duration":4,"visual":{"layout":"focus"},"edit":{"asset_start":6.2,"zoom":1.22,"focus_y":0.3,"callouts":[{"start":0.2,"end":3.7,"text":"LOCAL-VOICE.WAV CREATED","position":"bottom"}]}},
+    {"kind":"problem","headline":"NO HOSTED API REQUIRED","narration":"Piper is a local neural text to speech engine. The voice model stays on this machine.","caption":"Local model. Local text.","asset":"cache/004-local-ai-voice/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus_alt"},"edit":{"asset_start":0,"zoom":1.08,"focus_y":0.22}},
+    {"kind":"demo","headline":"RUN PIPER LOCALLY","narration":"Give Piper the model, an output filename, and the sentence. The captured command creates the WAV for real.","caption":"The command creates the WAV.","asset":"cache/004-local-ai-voice/capture/demo-real.mp4","duration":6,"visual":{"layout":"focus"},"edit":{"asset_start":2.3,"zoom":1.25,"focus_x":0.45,"focus_y":0.28,"callouts":[{"start":0.6,"end":5.7,"text":"VERIFIED FILE OUTPUT","position":"bottom"}]}},
+    {"kind":"payoff","headline":"PRIVATE BY DEFAULT","narration":"Useful voice generation, minus an upload queue and a ceremonial account. Check each model's license before publishing.","caption":"Verify the voice license.","asset":"cache/004-local-ai-voice/capture/demo-real.mp4","duration":5,"visual":{"layout":"focus"},"edit":{"asset_start":5.2,"zoom":1.2,"focus_y":0.35}}
+  ],"review":{"facts_checked":false,"assets_licensed":false,"final_approved":false}
+}

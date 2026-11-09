@@ -136,11 +136,15 @@ def build_frame(scene: dict, number: int, count: int, brand: str | None = None,
             pix[x,y] = (BG[0]+v, BG[1]+v, BG[2]+v)
     d = ImageDraw.Draw(img)
     d.rectangle((0,0, W,13), fill=LIME)
-    if scene.get("visual", {}).get("layout") == "focus":
+    layout = scene.get("visual", {}).get("layout")
+    if layout in {"focus", "focus_alt"}:
         d.rounded_rectangle((24, 35, 67, 79), radius=9, fill=LIME)
         d.text((36, 45), "D/", font=font(23, True), fill=BG)
-        d.text((80, 44), brand[:24].upper(), font=font(18, True), fill=PAPER)
+        brand_color = LIME if layout == "focus_alt" else PAPER
+        d.text((80, 44), brand[:24].upper(), font=font(18, True), fill=brand_color)
         d.text((450, 46), f"{number:02d}/{count:02d}", font=font(14, True), fill=MUTED)
+        if layout == "focus_alt":
+            d.rectangle((24, 84, 190, 89), fill=LIME)
         headline = scene.get("headline", "DEMONSTRATION").upper()
         size = 38 if len(headline) <= 22 else 31
         text_lines(d, (24, 92), headline, font(size, True), PAPER, 492,
