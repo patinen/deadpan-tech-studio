@@ -17,6 +17,18 @@ PRESETS = {
 }
 
 
+def focal_zoom_filter(edit: dict, width: int, height: int) -> str:
+    """Return a static, targeted crop; omitted settings preserve legacy framing."""
+    zoom = float(edit.get("zoom", 1.0))
+    if zoom <= 1.0:
+        return ""
+    focus_x = float(edit.get("focus_x", 0.5))
+    focus_y = float(edit.get("focus_y", 0.5))
+    x = f"min(max(iw*{focus_x:.3f}-iw/zoom/2,0),iw-iw/zoom)"
+    y = f"min(max(ih*{focus_y:.3f}-ih/zoom/2,0),ih-ih/zoom)"
+    return f",zoompan=z='{zoom:.3f}':x='{x}':y='{y}':d=1:s={width}x{height}:fps=30"
+
+
 def ffmpeg_filter_path(path: Path) -> str:
     """Escape an absolute path for an FFmpeg filter argument on Windows/POSIX."""
     return path.resolve().as_posix().replace(":", r"\:").replace("'", r"\'")
@@ -141,6 +153,7 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
             if focus:
                 insert = (f"[1:v]scale={insert_w}:{insert_h}:force_original_aspect_ratio=increase,"
                           f"crop={insert_w}:{insert_h},fps=30,setsar=1")
+                insert += focal_zoom_filter(scene.get("edit", {}), insert_w, insert_h)
                 if scene.get("edit", {}).get("motion") == "punch_in":
                     insert += (f",zoompan=z='min(zoom+0.0007,1.035)':"
                                "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:"

@@ -9,3 +9,4 @@ output/*
 *.pyc
 models/*.onnx
 models/*.onnx.json
+debug.log

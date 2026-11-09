@@ -42,6 +42,14 @@ def check(project: dict, require_approval: bool = False) -> tuple[list[str], lis
                 start, end = float(callout.get("start", -1)), float(callout.get("end", -1))
                 if start < 0 or end <= start or end > duration:
                     errors.append(f"Scene {i}: callout timing must stay within scene duration")
+            edit = scene.get("edit", {})
+            zoom = float(edit.get("zoom", 1.0))
+            focus_x = float(edit.get("focus_x", 0.5))
+            focus_y = float(edit.get("focus_y", 0.5))
+            if not 1 <= zoom <= 2:
+                errors.append(f"Scene {i}: edit.zoom must be between 1 and 2")
+            if not 0 <= focus_x <= 1 or not 0 <= focus_y <= 1:
+                errors.append(f"Scene {i}: edit focus coordinates must be between 0 and 1")
         except (ValueError, TypeError):
             errors.append(f"Scene {i}: invalid duration")
         combined = f"{scene.get('narration', '')} {scene.get('headline', '')}".lower()

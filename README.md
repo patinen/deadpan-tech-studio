@@ -138,6 +138,12 @@ Generated fixture files, recordings, evidence, narration, subtitle timing, rende
 
 Scenes with `visual.layout: "focus"` give the authentic recording most of the portrait canvas. Optional `edit.asset_start`, `edit.motion`, and timed `edit.callouts` provide deliberate cuts and short emphasis without applying a constant zoom to every scene. Existing projects without these fields retain the original inset layout.
 
+The audience-first sample is a 20–28 second narration-led edit that opens on the
+already revealed browser result, then cuts back to the command and shows the real
+button interaction. Optional `edit.zoom`, `edit.focus_x`, and `edit.focus_y`
+provide a static focal crop for phone readability. Values are deliberately
+scene-specific; projects that omit them retain their existing framing.
+
 ### Linux / Server
 
 ```bash

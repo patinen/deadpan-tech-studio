@@ -6,50 +6,55 @@
   "sources": ["https://docs.python.org/3/library/http.server.html"],
   "production": {
     "preset": "production", "capture": "http_server", "template": "terminal_explainer",
-    "caption_emphasis": ["localhost-only", "127.0.0.1", "real captured page", "bind flag", "Control C"],
+    "caption_emphasis": ["local website", "127.0.0.1", "result appears", "LAN access", "Control C"],
     "narration": {"engine": "piper", "voice": "en_US-lessac-medium", "speed": 168,
       "model": "models/en_US-lessac-medium.onnx", "pronunciations": {"localhost": "local host"}}
   },
   "scenes": [
     {
-      "kind": "hook", "headline": "A REAL LOCAL WEBSITE",
-      "narration": "Turn this folder into a localhost-only website with one command. No upload, account, or ceremonial dashboard.",
-      "caption": "A real server. Local only.",
-      "asset": "cache/002-instant-local-file-server/capture/server-start-real.mp4", "duration": 6,
-      "visual": {"layout": "focus"}, "edit": {"motion": "none", "callouts": [
-        {"start": 2.2, "end": 5.8, "text": "BOUND TO 127.0.0.1", "position": "top"}]}
+      "kind": "hook", "headline": "YOUR FOLDER. NOW A SITE.",
+      "narration": "One command turns this folder into a local website. Here is the result.",
+      "caption": "The result, before the explanation.",
+      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 4,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "asset_start": 2.4,
+        "zoom": 1.16, "focus_x": 0.5, "focus_y": 0.38, "callouts": [
+        {"start": 0.2, "end": 2.0, "text": "REAL LOCAL RESULT", "position": "top"}]}
     },
     {
       "kind": "problem", "headline": "BIND IT TO LOCALHOST",
-      "narration": "In a harmless test folder, run the command shown. The bind flag restricts the server to 127 dot 0 dot 0 dot 1: this machine only.",
+      "narration": "Run this in a harmless folder. The bind flag keeps it on this machine.",
       "caption": "Bind explicitly to localhost.",
-      "asset": "cache/002-instant-local-file-server/capture/server-start-real.mp4", "duration": 7,
-      "visual": {"layout": "focus"}, "edit": {"motion": "punch_in", "asset_start": 0.7, "callouts": [
-        {"start": 1.0, "end": 6.8, "text": "python -m http.server 8000 --bind 127.0.0.1", "position": "bottom"}]}
+      "asset": "cache/002-instant-local-file-server/capture/server-start-real.mp4", "duration": 4,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "asset_start": 0.5,
+        "zoom": 1.30, "focus_x": 0.40, "focus_y": 0.20, "callouts": [
+        {"start": 0.8, "end": 3.8, "text": "--bind 127.0.0.1", "position": "bottom"}]}
     },
     {
-      "kind": "demo", "headline": "LOCALHOST:8000",
-      "narration": "Open localhost colon eight thousand. This real captured page came from that folder, and the button works normally.",
-      "caption": "localhost:8000 — actually running",
-      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 7,
-      "visual": {"layout": "focus"}, "edit": {"motion": "none", "callouts": [
-        {"start": 0.5, "end": 3.0, "text": "REAL PLAYWRIGHT CAPTURE", "position": "top"}]}
+      "kind": "demo", "headline": "CLICK. RESULT.",
+      "narration": "Open localhost colon eight thousand. Click the button. The result comes from the actual served files.",
+      "caption": "A real click. A real response.",
+      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 5,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "asset_start": 0.7,
+        "zoom": 1.22, "focus_x": 0.5, "focus_y": 0.32, "callouts": [
+        {"start": 0.3, "end": 2.1, "text": "CLICK TO REVEAL", "position": "top"}]}
     },
     {
       "kind": "comparison", "headline": "LOCAL IS NOT LAN",
-      "narration": "Remove the bind flag only when you deliberately want LAN access. Other devices may connect, so serve only safe files.",
+      "narration": "Remove the bind only for deliberate LAN access. Otherwise, keep your files to yourself.",
       "caption": "LAN access should be deliberate.",
-      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 7,
-      "visual": {"layout": "focus"}, "edit": {"motion": "none", "asset_start": 4.0, "callouts": [
-        {"start": 0.6, "end": 6.8, "text": "LOCALHOST ≠ YOUR WHOLE NETWORK", "position": "bottom"}]}
+      "asset": "cache/002-instant-local-file-server/capture/browser-real.mp4", "duration": 4,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none", "asset_start": 4.0,
+        "zoom": 1.20, "focus_x": 0.5, "focus_y": 0.55, "callouts": [
+        {"start": 0.4, "end": 3.8, "text": "LOCALHOST ≠ YOUR WHOLE NETWORK", "position": "bottom"}]}
     },
     {
       "kind": "payoff", "headline": "DONE? CONTROL C.",
-      "narration": "Press Control C when finished. The captured process stops cleanly. Software that understands when to leave. Remarkable.",
+      "narration": "Control C stops it. Software that leaves when asked. Remarkable.",
       "caption": "Start locally. Stop cleanly.",
-      "asset": "cache/002-instant-local-file-server/capture/server-stop-real.mp4", "duration": 6,
-      "visual": {"layout": "focus"}, "edit": {"motion": "none", "callouts": [
-        {"start": 2.0, "end": 5.8, "text": "PROCESS EXITED", "position": "top"}]}
+      "asset": "cache/002-instant-local-file-server/capture/server-stop-real.mp4", "duration": 4,
+      "visual": {"layout": "focus"}, "edit": {"motion": "none",
+        "zoom": 1.24, "focus_x": 0.42, "focus_y": 0.24, "callouts": [
+        {"start": 1.5, "end": 3.8, "text": "STOPPED CLEANLY", "position": "top"}]}
     }
   ],
   "review": {"facts_checked": false, "assets_licensed": false, "final_approved": false}
