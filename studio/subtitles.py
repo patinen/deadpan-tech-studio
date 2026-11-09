@@ -131,7 +131,7 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Dynamic,Arial,{size},&H00F4F4ED,&H000000FF,&H00101518,&HCC101518,-1,0,0,0,100,100,0,0,3,2,0,2,42,42,{margin_v},1
+Style: Dynamic,Arial,{size},&H00F4F4ED,&H000000FF,&H00101518,&H00101518,-1,0,0,0,100,100,0,0,1,4,2,2,42,42,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -146,4 +146,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 text = (text[:match.start()] + r"{\c&H57F4C9&}" + match.group() +
                         r"{\rDynamic}" + text[match.end():])
         events.append(f"Dialogue: 0,{_ass_time(float(cue['start']))},{_ass_time(float(cue['end']))},Dynamic,,0,0,0,,{text}")
+    path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")
+
+
+def write_callouts_ass(path: Path, callouts: list[dict], width: int, height: int) -> None:
+    """Write restrained, explicitly timed callouts separate from narration captions."""
+    size = 22 if width == 540 else 44
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {width}
+PlayResY: {height}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Top,Arial,{size},&H0018100C,&H000000FF,&H0057F4C9,&H0057F4C9,-1,0,0,0,100,100,0,0,3,3,0,8,38,38,{round(height*.17)},1
+Style: Bottom,Arial,{size},&H0018100C,&H000000FF,&H0057F4C9,&H0057F4C9,-1,0,0,0,100,100,0,0,3,3,0,2,38,38,{round(height*.25)},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    events = []
+    for callout in callouts:
+        text = str(callout.get("text", "")).replace("{", "(").replace("}", ")")
+        style = "Top" if callout.get("position") == "top" else "Bottom"
+        events.append(f"Dialogue: 1,{_ass_time(float(callout['start']))},"
+                      f"{_ass_time(float(callout['end']))},{style},,0,0,0,,{text}")
     path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")

@@ -90,6 +90,37 @@ Successful renders create:
 
 The reusable `visual.template: "local_demo"` supports terminal and browser modes. It is labelled as locally reproducible rather than real captured footage, and the quality report still requires human verification. Selective caption emphasis is configured with `production.caption_emphasis`; unmatched phrases stay visually quiet.
 
+## Task 03 authentic demonstration capture
+
+Task 03 replaces the sample's illustrated terminal/browser cards with evidence-backed source recordings. The capture harness creates an isolated folder containing four harmless fixture files, starts the real command below as a subprocess, verifies an HTTP 200 response, records real Chromium interaction with Playwright, interrupts the server, and writes hashes plus process evidence to `cache/<id>/capture/capture-manifest.json`. Browser footage is a direct Playwright recording. Terminal clips are clearly labelled process transcripts rendered from the observed PID, HTTP status, and exit code; they are not presented as camera footage of a terminal window.
+
+```text
+python -m http.server 8000 --bind 127.0.0.1
+```
+
+The explicit bind makes the tutorial localhost-only. Omitting `--bind 127.0.0.1` may expose the server to other devices on reachable interfaces; do that only when LAN access is deliberate and the served files are safe to share. Python's simple server is a convenience tool, not a hardened public server.
+
+Install the capture dependency once:
+
+```powershell
+pip install playwright
+playwright install chromium
+```
+
+Then capture and build separately, or use the repeatable one-command path:
+
+```powershell
+python studio.py capture content/002-instant-local-file-server.json
+python studio.py build content/002-instant-local-file-server.json
+
+# Capture + local narration + production render
+python studio.py build content/002-instant-local-file-server.json --capture
+```
+
+Generated fixture files, recordings, evidence, narration, subtitle timing, rendered videos, thumbnails, and reports remain under ignored `cache/` and `output/` directories. No browser profile, personal file, API credential, or generated media is committed.
+
+Scenes with `visual.layout: "focus"` give the authentic recording most of the portrait canvas. Optional `edit.asset_start`, `edit.motion`, and timed `edit.callouts` provide deliberate cuts and short emphasis without applying a constant zoom to every scene. Existing projects without these fields retain the original inset layout.
+
 ### Linux / Server
 
 ```bash

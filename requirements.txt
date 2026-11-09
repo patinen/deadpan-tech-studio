@@ -2,3 +2,4 @@ Pillow>=10.4,<13
 requests>=2.31,<3
 # Optional: pip install edge-tts to enable the 'edge' speech engine.
 # Optional production-local voice: pip install piper-tts, then download a licensed model.
+# Task 03 capture: pip install playwright && playwright install chromium
