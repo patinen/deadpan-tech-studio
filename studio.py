@@ -16,6 +16,7 @@ from studio.writer import create_script
 from studio.capture import capture_http_server_demo
 from studio.visual_qa import generate_contact_sheet
 from studio.recipe_capture import capture_recipe
+from studio.scout import run_scout
 
 
 def load_env():
@@ -36,6 +37,13 @@ def main():
     g.add_argument("idea")
     g.add_argument("--source", action="append", default=[], help="Verified source URL (repeatable)")
     g.add_argument("--model", default=None)
+    s = sub.add_parser("scout", help="Rank evidence-backed topic proposals without producing videos")
+    s.add_argument("--limit", type=int, default=15)
+    s.add_argument("--fixture", action="store_true", help="Use clearly labelled offline sample data")
+    s.add_argument("--sources", default=str(ROOT / "scout" / "sources.json"))
+    s.add_argument("--weights", default=str(ROOT / "scout" / "weights.json"))
+    s.add_argument("--output-dir", default=str(ROOT / "research"))
+    s.add_argument("--include-known", action="store_true", help="Do not filter prior research/content")
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -78,6 +86,20 @@ def main():
             dest.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
             print(f"Draft saved: {dest}")
             print("Review script, verify factual claims, and add genuine footage to scenes[].asset")
+            return 0
+        if args.cmd == "scout":
+            fixture = ROOT / "fixtures" / "scout" / "sample-items.json" if args.fixture else None
+            json_path, markdown_path, report = run_scout(
+                limit=args.limit, fixture_path=fixture, sources_path=Path(args.sources).resolve(),
+                weights_path=Path(args.weights).resolve(), output_dir=Path(args.output_dir).resolve(),
+                include_known=args.include_known)
+            print(f"Research status: {report['status']} ({len(report['proposals'])} proposals)")
+            print("JSON report:", json_path)
+            print("Markdown report:", markdown_path)
+            if report["source_failures"]:
+                for failure in report["source_failures"]:
+                    print("WARNING:", failure)
+            print("No demos executed. Select and verify a proposal manually before scripting.")
             return 0
         path = Path(args.project).resolve()
         project = load_project(path)
