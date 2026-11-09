@@ -76,11 +76,25 @@ def validate_manifest(manifest: dict, project: dict, durations: list[float]) -> 
 
 
 def load_or_create_manifest(path: Path, project: dict, durations: list[float],
-                            audio_aligned: list[bool]) -> dict:
+                            audio_aligned: list[bool], *, auto_refresh: bool = False) -> dict:
     if path.exists():
         manifest = json.loads(path.read_text(encoding="utf-8"))
-        validate_manifest(manifest, project, durations)
-        return manifest
+        needs_audio_refresh = any(
+            aligned and entry.get("timing_source") != "measured_audio"
+            for entry, aligned in zip(manifest.get("scenes", []), audio_aligned)
+        )
+        duration_changed = any(
+            abs(float(entry.get("duration", -1)) - duration) > 0.05
+            for entry, duration in zip(manifest.get("scenes", []), durations)
+        ) or len(manifest.get("scenes", [])) != len(durations)
+        if not (auto_refresh and (needs_audio_refresh or duration_changed)):
+            if needs_audio_refresh:
+                raise ValueError(
+                    "Subtitle manifest uses nominal timing but narration audio is now available; "
+                    "update the manifest or omit --subtitles to regenerate it"
+                )
+            validate_manifest(manifest, project, durations)
+            return manifest
     manifest = build_manifest(project, durations, audio_aligned)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
