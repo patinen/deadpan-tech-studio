@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -27,11 +28,11 @@ def demo_command(site: Path) -> list[str]:
             "--directory", str(site)]
 
 
-def prepare_demo_site(site: Path) -> list[Path]:
+def prepare_demo_site(site: Path, marker: str = "deadpan-local-demo") -> list[Path]:
     site.mkdir(parents=True, exist_ok=True)
     files = {
-        "index.html": """<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width"><title>Local Demo</title>
+        "index.html": f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width"><meta name="capture-marker" content="{marker}"><title>Local Demo</title>
 <link rel="stylesheet" href="style.css"></head><body><main>
 <p class="eyebrow">LOCALHOST-ONLY DEMO</p><h1>Your folder is being served.</h1>
 <p>These harmless files came from an isolated capture fixture.</p>
@@ -45,7 +46,7 @@ font:24px Arial,sans-serif}main{max-width:900px;margin:0 auto;padding:90px 72px}
 font-weight:800;letter-spacing:.12em}h1{font-size:64px;line-height:1.02;margin:28px 0}p{line-height:1.45;
 color:#bac1c4}button{background:#c9f457;border:0;border-radius:14px;padding:20px 30px;font-size:24px;
 font-weight:800;cursor:pointer}section,aside{margin-top:36px;padding:28px;border:2px solid #526058;
-border-radius:18px;background:#171d24}section{display:grid;gap:12px}section strong{color:#c9f457;font-size:34px}
+border-radius:18px;background:#171d24}[hidden]{display:none!important}section{display:grid;gap:12px}section strong{color:#c9f457;font-size:34px}
 aside b{display:block;color:#f97767;font-size:28px}code{display:block;margin:18px 0;color:#c9f457;
 font-size:27px}aside p{font-size:21px;margin-bottom:0}.pulse{outline:8px solid rgba(201,244,87,.3)}""",
         "demo.js": """document.querySelector('#inspect').addEventListener('click',e=>{
@@ -61,16 +62,70 @@ document.querySelector('#result').scrollIntoView({behavior:'smooth',block:'cente
     return paths
 
 
-def _wait_for_server(url: str, timeout: float = 8.0) -> int:
+def assert_port_available(host: str = HOST, port: int = PORT) -> None:
+    """Fail before capture mutation when another process owns the configured port."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if os.name == "nt":
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        probe.bind((host, port))
+    except OSError as exc:
+        raise RuntimeError(
+            f"Capture port {host}:{port} is already in use; stop that process or choose another port"
+        ) from exc
+    finally:
+        probe.close()
+
+
+def _wait_for_server(url: str, expected_marker: str, process: subprocess.Popen,
+                     timeout: float = 8.0) -> int:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
+            if process.poll() is not None:
+                raise RuntimeError(
+                    f"Demo server exited before readiness with code {process.returncode}"
+                )
             with urlopen(url, timeout=0.5) as response:
-                if response.status == 200:
+                body = response.read().decode("utf-8", errors="replace")
+                if response.status == 200 and expected_marker in body:
                     return response.status
+                if response.status == 200:
+                    raise RuntimeError(
+                        "Port responded with unrelated content; refusing to capture another server"
+                    )
         except OSError:
             time.sleep(0.1)
     raise RuntimeError(f"Local demo server did not become ready at {url}")
+
+
+def _stop_process(server: subprocess.Popen) -> tuple[int, bool]:
+    """Interrupt only the process we started, with a bounded kill fallback."""
+    forced = False
+    if server.poll() is None:
+        try:
+            if os.name == "nt":
+                server.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                server.send_signal(signal.SIGINT)
+        except ProcessLookupError:
+            pass
+    try:
+        server.wait(timeout=4)
+    except subprocess.TimeoutExpired:
+        forced = True
+        server.kill()
+        server.wait(timeout=2)
+    return int(server.returncode), forced
+
+
+def stop_transcript(exit_code: int | None, forced: bool) -> str:
+    """Describe cleanup without exposing an opaque platform-specific exit code."""
+    if forced:
+        return "Process had to be stopped after the interrupt timed out"
+    if exit_code is None:
+        return "Process stop status unavailable"
+    return "Process stopped by Control C"
 
 
 def _terminal_frame(lines: list[str], path: Path, cursor: bool = False) -> None:
@@ -153,11 +208,14 @@ def _record_browser(url: str, work: Path) -> Path:
 def capture_http_server_demo(project: dict) -> dict:
     """Capture real server/browser behavior and return an evidence manifest."""
     slug = slugify(project["id"])
-    work = ROOT / "cache" / slug / "capture"
+    assert_port_available()
+    final_work = ROOT / "cache" / slug / "capture"
+    work = ROOT / "cache" / slug / "capture-staging"
+    if work.exists():
+        shutil.rmtree(work)
     site = work / "site"
-    if site.exists():
-        shutil.rmtree(site)
-    site_files = prepare_demo_site(site)
+    marker = f"deadpan-capture-{uuid.uuid4().hex}"
+    site_files = prepare_demo_site(site, marker)
     url = f"http://{HOST}:{PORT}/"
     command = demo_command(site)
     command_display = f"python -m http.server {PORT} --bind {HOST}"
@@ -169,7 +227,7 @@ def capture_http_server_demo(project: dict) -> dict:
     except OSError as exc:
         raise RuntimeError(f"Could not start isolated demo server: {exc}") from exc
     try:
-        status = _wait_for_server(url)
+        status = _wait_for_server(url, marker, server)
         start_clip = _make_terminal_clip(work, "server-start-real", [
             (1.2, [f"$ {command_display}"]),
             (3.8, [f"$ {command_display}", f"Process started: PID {server.pid}",
@@ -177,19 +235,10 @@ def capture_http_server_demo(project: dict) -> dict:
         ])
         browser_clip = _record_browser(url, work)
     finally:
-        if os.name == "nt":
-            server.send_signal(signal.CTRL_BREAK_EVENT)
-        else:
-            server.send_signal(signal.SIGINT)
-        try:
-            server.wait(timeout=4)
-        except subprocess.TimeoutExpired:
-            server.kill()
-            server.wait(timeout=2)
-    exit_code = server.returncode
+        exit_code, forced_stop = _stop_process(server)
     stop_clip = _make_terminal_clip(work, "server-stop-real", [
         (1.5, [f"$ {command_display}", "^C"]),
-        (2.8, [f"$ {command_display}", "^C", f"Process exited: code {exit_code}", "$ "]),
+        (2.8, [f"$ {command_display}", "^C", stop_transcript(exit_code, forced_stop), "$ "]),
     ])
     if server.poll() is None:
         raise RuntimeError("Demo server remained running after capture")
@@ -198,13 +247,17 @@ def capture_http_server_demo(project: dict) -> dict:
         "host": HOST, "port": PORT, "url": url,
         "command": command_display, "server_pid": server.pid,
         "verified_http_status": status, "server_stopped": True, "exit_code": exit_code,
-        "site_directory": str(site),
+        "forced_stop": forced_stop, "site_directory": str(final_work / "site"),
         "files": [{"name": path.name,
                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
                   for path in site_files],
-        "assets": {"start": str(start_clip), "browser": str(browser_clip),
-                   "stop": str(stop_clip)},
+        "assets": {"start": str(final_work / start_clip.name),
+                   "browser": str(final_work / browser_clip.name),
+                   "stop": str(final_work / stop_clip.name)},
     }
     manifest = work / "capture-manifest.json"
     manifest.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    if final_work.exists():
+        shutil.rmtree(final_work)
+    shutil.move(str(work), str(final_work))
     return evidence

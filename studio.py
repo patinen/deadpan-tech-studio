@@ -14,6 +14,7 @@ from studio.speech import make_voice
 from studio.utils import ROOT, load_project, slugify
 from studio.writer import create_script
 from studio.capture import capture_http_server_demo
+from studio.visual_qa import generate_contact_sheet
 
 
 def load_env():
@@ -58,6 +59,9 @@ def main():
     b.add_argument("--preset", choices=["draft", "production"], default=None)
     b.add_argument("--subtitles", default=None, help="Editable subtitle timing JSON path")
     b.add_argument("--capture", action="store_true", help="Capture configured real demo first")
+    qa = sub.add_parser("visual-qa", help="Create a contact sheet for human video review")
+    qa.add_argument("project")
+    qa.add_argument("--video", default=None)
     args = p.parse_args()
     try:
         if args.cmd == "generate":
@@ -91,6 +95,14 @@ def main():
             evidence = capture_http_server_demo(project)
             print("Captured real local demo:", evidence["url"])
             print("Capture assets:", ", ".join(evidence["assets"].values()))
+        if args.cmd == "visual-qa":
+            video = (Path(args.video).resolve() if args.video else
+                     ROOT / "output" / f"{slugify(project['id'])}.mp4")
+            if not video.is_file():
+                raise FileNotFoundError(f"Rendered video not found: {video}")
+            sheet, qa_report = generate_contact_sheet(project, video)
+            print("Contact sheet:", sheet)
+            print("Visual QA data:", qa_report)
         if args.cmd in {"voice", "build"}:
             for voice_path in make_voice(project, engine=args.engine,
                                          speed=getattr(args, "speed", None),
