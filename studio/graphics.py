@@ -91,6 +91,38 @@ def _draw_placeholder(draw, scene, number: int):
     draw.text((x1+35,y2-43),"ILLUSTRATIVE • ADD REAL FOOTAGE",font=font(12,True),fill=MUTED)
 
 
+def _draw_local_demo(draw, scene: dict):
+    """Reusable terminal/browser visual for workflows reproducible on the local machine."""
+    x1, y1, x2, y2 = PANEL
+    visual = scene.get("visual", {})
+    mode = visual.get("mode", "terminal")
+    draw.rounded_rectangle((x1+12, y1+12, x2-12, y2-12), radius=14,
+                           fill=(17, 22, 29), outline=(80, 94, 82), width=2)
+    draw.rounded_rectangle((x1+25, y1+28, x2-25, y1+66), radius=8, fill=(32, 39, 47))
+    for n, color in enumerate((CORAL, (246, 201, 90), LIME)):
+        draw.ellipse((x1+40+n*24, y1+40, x1+52+n*24, y1+52), fill=color)
+    if mode == "browser":
+        draw.rounded_rectangle((x1+125, y1+37, x2-43, y1+58), radius=7, fill=(48, 57, 66))
+        draw.text((x1+140, y1+39), visual.get("address", "localhost:8000"),
+                  font=font(12), fill=PAPER)
+        draw.text((x1+45, y1+105), visual.get("title", "PROJECT FILES"),
+                  font=font(20, True), fill=LIME)
+        for idx, item in enumerate(visual.get("items", ["index.html", "notes.txt", "assets/"])):
+            y = y1 + 154 + idx * 48
+            draw.rounded_rectangle((x1+42, y, x2-42, y+35), radius=7, fill=(31, 38, 46))
+            draw.text((x1+57, y+7), item, font=font(15), fill=PAPER)
+    else:
+        draw.text((x1+42, y1+98), visual.get("prompt", "C:\\project>"),
+                  font=font(16, True), fill=MUTED)
+        draw.text((x1+42, y1+137), visual.get("command", "python -m http.server"),
+                  font=font(21, True), fill=LIME)
+        draw.text((x1+42, y1+203), visual.get("result", "Serving on port 8000"),
+                  font=font(16), fill=PAPER)
+        draw.rounded_rectangle((x1+42, y1+254, x2-42, y1+296), radius=8, fill=(38, 61, 43))
+        draw.text((x1+58, y1+265), "LOCAL SERVER RUNNING", font=font(15, True), fill=LIME)
+    draw.text((x1+35, y2-43), "LOCALLY REPRODUCIBLE DEMO", font=font(12, True), fill=MUTED)
+
+
 def build_frame(scene: dict, number: int, count: int, brand: str | None = None,
                 draft: bool = True, has_video: bool = False) -> Image.Image:
     brand = brand or os.environ.get("BRAND_NAME", "DEADPAN TECH")
@@ -118,7 +150,10 @@ def build_frame(scene: dict, number: int, count: int, brand: str | None = None,
     x1,y1,x2,y2 = PANEL
     d.rounded_rectangle(PANEL,radius=22,fill=(23,28,37),outline=(74,84,72),width=2)
     if not has_video:
-        _draw_placeholder(d, scene, number)
+        if scene.get("visual", {}).get("template") == "local_demo":
+            _draw_local_demo(d, scene)
+        else:
+            _draw_placeholder(d, scene, number)
     d.text((39,731),"THE SHORT VERSION",font=font(15,True),fill=LIME)
     caption = scene.get("caption", "")
     text_lines(d,(39,770),caption,font(33,True),PAPER,455,line_height=43,max_lines=3)

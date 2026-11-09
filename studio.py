@@ -36,20 +36,23 @@ def main():
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
-    v = sub.add_parser("voice", help="Narrate each scene (espeak/edge/piper)")
+    v = sub.add_parser("voice", help="Narrate each scene (espeak/sapi/edge/piper)")
     v.add_argument("project")
-    v.add_argument("--engine", choices=["espeak", "piper", "edge"], default="espeak")
-    v.add_argument("--speed", type=int, default=158)
+    v.add_argument("--engine", choices=["espeak", "sapi", "piper", "edge"], default=None)
+    v.add_argument("--speed", type=int, default=None)
+    v.add_argument("--voice", default=None)
     r = sub.add_parser("render", help="Render a preview MP4 from a JSON script")
     r.add_argument("project")
     r.add_argument("--output", default=None)
-    r.add_argument("--preset", choices=["draft", "production"], default="draft")
+    r.add_argument("--preset", choices=["draft", "production"], default=None)
     r.add_argument("--subtitles", default=None, help="Editable subtitle timing JSON path")
     b = sub.add_parser("build", help="Voice + render in one command")
     b.add_argument("project")
-    b.add_argument("--engine", choices=["espeak", "piper", "edge"], default="espeak")
+    b.add_argument("--engine", choices=["espeak", "sapi", "piper", "edge"], default=None)
+    b.add_argument("--speed", type=int, default=None)
+    b.add_argument("--voice", default=None)
     b.add_argument("--output", default=None)
-    b.add_argument("--preset", choices=["draft", "production"], default="draft")
+    b.add_argument("--preset", choices=["draft", "production"], default=None)
     b.add_argument("--subtitles", default=None, help="Editable subtitle timing JSON path")
     args = p.parse_args()
     try:
@@ -79,12 +82,14 @@ def main():
             print("Draft schema OK" if not args.strict else "Ready for publishing (review flags confirmed)")
         if args.cmd in {"voice", "build"}:
             for voice_path in make_voice(project, engine=args.engine,
-                                         speed=getattr(args, "speed", 158)):
+                                         speed=getattr(args, "speed", None),
+                                         voice=getattr(args, "voice", None)):
                 print("Narration:", voice_path)
         if args.cmd in {"render", "build"}:
             dest = Path(args.output).resolve() if args.output else None
             subtitles = Path(args.subtitles).resolve() if args.subtitles else None
-            output, render_warnings = render(project, path, dest, preset=args.preset,
+            preset = args.preset or project.get("production", {}).get("preset", "draft")
+            output, render_warnings = render(project, path, dest, preset=preset,
                                              subtitle_manifest=subtitles)
             print(f"Rendered: {output} ({output.stat().st_size / 1024 / 1024:.1f} MB)")
             for warning in render_warnings:

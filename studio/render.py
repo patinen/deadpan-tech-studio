@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
+from PIL import Image
 
 from .graphics import PANEL, W, H, build_frame, paste_still
 from .subtitles import load_or_create_manifest, write_ass
+from .quality import check
 from .utils import ROOT, assert_tool, duration_seconds, run, slugify
 
 STILL_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -19,6 +22,15 @@ PRESETS = {
 def ffmpeg_filter_path(path: Path) -> str:
     """Escape an absolute path for an FFmpeg filter argument on Windows/POSIX."""
     return path.resolve().as_posix().replace(":", r"\:").replace("'", r"\'")
+
+
+def probe_media(path: Path) -> dict:
+    output = subprocess.check_output([
+        "ffprobe", "-v", "error", "-show_entries",
+        "stream=codec_name,codec_type,width,height,pix_fmt,sample_rate,channels:format=duration,size",
+        "-of", "json", str(path),
+    ], text=True)
+    return json.loads(output)
 
 
 def resolve_asset(asset: str | None, project_file: Path) -> Path | None:
@@ -82,8 +94,10 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
         has_video = bool(path and path.suffix.lower() in VIDEO_EXTS)
         if path and path.suffix.lower() not in VIDEO_EXTS | STILL_EXTS:
             raise ValueError(f"Unsupported media type: {path.suffix}")
-        if not path:
+        if not path and scene.get("visual", {}).get("template") != "local_demo":
             warnings.append(f"Scene {idx+1}: placeholder art instead of a recorded demo")
+        elif not path:
+            warnings.append(f"Scene {idx+1}: designed local demonstration; visually verify before release")
         frame = build_frame(scene, idx+1, len(project["scenes"]), draft=not approved,
                             has_video=bool(path))
         if path and path.suffix.lower() in STILL_EXTS:
@@ -97,7 +111,8 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
         ass_path = work / f"subtitles-{idx:02d}.ass"
         write_ass(ass_path, subtitles["scenes"][idx]["cues"], config["width"], config["height"])
         ass_filter = ffmpeg_filter_path(ass_path)
-        motion = (f"zoompan=z='min(zoom+0.00018,1.012)':d=1:"
+        motion = (f"zoompan=z='min(zoom+0.00018,1.012)':"
+                  "x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:"
                   f"s={config['width']}x{config['height']}:fps=30")
         if not voice:
             warnings.append(f"Scene {idx+1}: no recorded narration found (silent render)")
@@ -133,13 +148,26 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
     concat.write_text("".join(f"file '{p.as_posix()}'\n" for p in scene_files), encoding="utf-8")
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "concat",
          "-safe", "0", "-i", str(concat), "-c", "copy", "-movflags", "+faststart", str(output)])
+    thumbnail = output.parent / f"{slug}.thumbnail.jpg"
+    with Image.open(work / "frame-00.png") as cover:
+        cover.convert("RGB").save(thumbnail, quality=92, optimize=True)
+    quality_errors, quality_warnings = check(project, require_approval=True)
+    voice_manifest = ROOT / "cache" / slug / "voice_manifest.json"
+    voice_info = json.loads(voice_manifest.read_text(encoding="utf-8")) if voice_manifest.exists() else {}
+    if voice_info.get("engine") == "espeak":
+        warnings.append("Offline eSpeak narration is a rough editorial reference, not release-quality voice")
+    blockers = quality_errors + ([] if all(voices) else ["Narration audio is missing for one or more scenes"])
     details = {
-        "project": str(project_file), "video": str(output), "duration_seconds": sum(actual_times),
+        "project": str(project_file), "video": str(output), "thumbnail": str(thumbnail),
+        "duration_seconds": sum(actual_times), "audio_present": all(voices),
         "status": "approved" if approved else "draft", "preset": preset,
         "width": config["width"], "height": config["height"],
-        "subtitle_manifest": str(subtitle_manifest), "warnings": warnings,
+        "subtitle_manifest": str(subtitle_manifest), "narration": voice_info,
+        "media": probe_media(output),
+        "publication_ready": not blockers, "blockers": blockers,
+        "warnings": quality_warnings + warnings,
     }
-    (output.parent / f"{slug}.render.json").write_text(
+    (output.parent / f"{slug}.quality.json").write_text(
         json.dumps(details, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     return output, warnings

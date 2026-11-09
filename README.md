@@ -60,6 +60,36 @@ Each cue uses seconds relative to its scene. Edit `start`, `end`, or `text`, kee
 
 The default cache manifest refreshes automatically when measured narration replaces a silent preview or its measured duration changes. Explicit files passed with `--subtitles` are never overwritten in that situation; rendering stops and asks the editor to update them.
 
+## Task 02 production project
+
+The first production-oriented project is a locally reproducible Python folder-server demo. Its JSON config selects the production preset, narration voice, speed, pronunciation replacements, reusable terminal/browser visuals, and a small set of caption emphasis terms:
+
+```powershell
+# One command: narration, 1080x1920 render, thumbnail, and quality report
+python studio.py build content/002-instant-local-file-server.json
+
+# Fully offline editorial fallback (rough voice; requires eSpeak)
+python studio.py build content/002-instant-local-file-server.json --engine espeak
+```
+
+The sample config uses the local Piper voice `en_US-lessac-medium`. Install `piper-tts`, then download the model locally (the model and cache remain gitignored):
+
+```powershell
+pip install piper-tts
+python -m piper.download_voices en_US-lessac-medium --download-dir models
+```
+
+Piper is the preferred production-oriented local path. Windows SAPI is also supported as a credential-free fallback, installed voices permitting; eSpeak remains the deliberately rough proof voice. The optional `edge-tts` adapter is network-dependent and uses an unofficial service that may return no audio; the pipeline reports that failure rather than pretending it worked. CLI `--engine`, `--voice`, and `--speed` values override project settings. Narration cache keys include the complete voice configuration, so changing speed, model, or pronunciation cannot accidentally reuse stale audio.
+
+Successful renders create:
+
+- `output/<id>.mp4` — H.264/AAC video
+- `output/<id>.thumbnail.jpg` — portrait preview/thumbnail frame
+- `output/<id>.quality.json` — technical details, narration configuration, warnings, blockers, and publication-readiness state
+- `cache/<id>/subtitles.json` — editable phrase-level timing
+
+The reusable `visual.template: "local_demo"` supports terminal and browser modes. It is labelled as locally reproducible rather than real captured footage, and the quality report still requires human verification. Selective caption emphasis is configured with `production.caption_emphasis`; unmatched phrases stay visually quiet.
+
 ### Linux / Server
 
 ```bash

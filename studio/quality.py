@@ -58,6 +58,11 @@ def check(project: dict, require_approval: bool = False) -> tuple[list[str], lis
                 errors.append(f"Publication blocked until review.{key}=true")
     if not sources:
         warnings.append("No source references recorded: verify any factual claims")
-    if all(not scene.get("asset") for scene in scenes if isinstance(scene, dict)):
+    if all(not scene.get("asset") and
+           scene.get("visual", {}).get("template") != "local_demo"
+           for scene in scenes if isinstance(scene, dict)):
         warnings.append("No real footage/screenshots added: draft preview only")
+    elif any(scene.get("visual", {}).get("template") == "local_demo"
+             for scene in scenes if isinstance(scene, dict)):
+        warnings.append("Locally designed demo visuals require human verification against the real workflow")
     return errors, warnings

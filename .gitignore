@@ -7,3 +7,5 @@ output/*
 !cache/.gitkeep
 !output/.gitkeep
 *.pyc
+models/*.onnx
+models/*.onnx.json
