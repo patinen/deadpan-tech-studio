@@ -5,6 +5,7 @@ from pathlib import Path
 
 from studio.quality import check
 from studio.render import PRESETS
+from studio.speech import narration_config
 from studio.subtitles import (build_manifest, group_phrases, load_or_create_manifest,
                               validate_manifest)
 from studio.utils import narr_hash, slugify
@@ -92,6 +93,33 @@ class PipelineTests(unittest.TestCase):
                 scene["timing_source"] == "measured_audio" for scene in refreshed["scenes"]
             ))
             self.assertEqual(refreshed["scenes"][0]["duration"], measured[0])
+
+    def test_task_02_project_is_backward_compatible_and_uses_local_demo(self):
+        project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
+        errors, warnings = check(project)
+        self.assertFalse(errors)
+        self.assertTrue(all(scene["visual"]["template"] == "local_demo"
+                            for scene in project["scenes"]))
+        self.assertFalse(any("No real footage" in warning for warning in warnings))
+        self.assertTrue(any("human verification" in warning for warning in warnings))
+
+    def test_project_narration_configuration_and_cli_override(self):
+        project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
+        config = narration_config(project)
+        self.assertEqual(config["engine"], "piper")
+        self.assertEqual(config["voice"], "en_US-lessac-medium")
+        self.assertEqual(narration_config(project, engine="espeak", speed=145)["engine"], "espeak")
+
+    def test_caption_emphasis_is_selective(self):
+        project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
+        durations = [float(scene["duration"]) for scene in project["scenes"]]
+        manifest = build_manifest(project, durations, [False] * len(durations))
+        emphasized = [cue for scene in manifest["scenes"] for cue in scene["cues"]
+                      if cue.get("emphasis")]
+        plain = [cue for scene in manifest["scenes"] for cue in scene["cues"]
+                 if not cue.get("emphasis")]
+        self.assertTrue(emphasized)
+        self.assertTrue(plain)
 
 
 if __name__ == "__main__":

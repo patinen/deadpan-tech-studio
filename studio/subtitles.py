@@ -42,6 +42,16 @@ def time_phrases(text: str, duration: float, *, lead: float = 0.12,
 
 
 def build_manifest(project: dict, durations: list[float], audio_aligned: list[bool]) -> dict:
+    emphasis_terms = project.get("production", {}).get("caption_emphasis", [])
+    def scene_cues(scene: dict, duration: float) -> list[dict]:
+        cues = time_phrases(scene["narration"], duration)
+        for cue in cues:
+            match = next((term for term in emphasis_terms
+                          if term.lower() in cue["text"].lower()), None)
+            if match:
+                cue["emphasis"] = match
+        return cues
+
     return {
         "version": 1,
         "note": "Editable phrase timing in seconds, relative to each scene.",
@@ -51,7 +61,7 @@ def build_manifest(project: dict, durations: list[float], audio_aligned: list[bo
                 "narration_hash": narr_hash(scene["narration"]),
                 "timing_source": "measured_audio" if aligned else "nominal_scene_duration",
                 "duration": round(duration, 3),
-                "cues": time_phrases(scene["narration"], duration),
+                "cues": scene_cues(scene, duration),
             }
             for index, (scene, duration, aligned) in enumerate(
                 zip(project["scenes"], durations, audio_aligned)
@@ -129,8 +139,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     events = []
     for cue in cues:
         text = str(cue["text"]).replace("{", "(").replace("}", ")").replace("\n", " ")
-        first, separator, rest = text.partition(" ")
-        if separator:
-            text = rf"{{\c&H57F4C9&}}{first}{{\rDynamic}} {rest}"
+        emphasis = str(cue.get("emphasis", ""))
+        if emphasis:
+            match = re.search(re.escape(emphasis), text, re.IGNORECASE)
+            if match:
+                text = (text[:match.start()] + r"{\c&H57F4C9&}" + match.group() +
+                        r"{\rDynamic}" + text[match.end():])
         events.append(f"Dialogue: 0,{_ass_time(float(cue['start']))},{_ass_time(float(cue['end']))},Dynamic,,0,0,0,,{text}")
     path.write_text(header + "\n".join(events) + "\n", encoding="utf-8-sig")

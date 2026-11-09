@@ -1,0 +1,105 @@
+{
+  "id": "002-instant-local-file-server",
+  "title": "Turn Any Folder Into a Local Website",
+  "description": "Use Python's built-in HTTP server to preview or share a folder on a trusted local network.",
+  "hook": "This folder can become a local website with one command.",
+  "sources": [
+    "https://docs.python.org/3/library/http.server.html"
+  ],
+  "production": {
+    "preset": "production",
+    "template": "terminal_explainer",
+    "caption_emphasis": ["one command", "Python", "localhost", "trusted network", "Control C"],
+    "narration": {
+      "engine": "piper",
+      "voice": "en_US-lessac-medium",
+      "speed": 158,
+      "model": "models/en_US-lessac-medium.onnx",
+      "pronunciations": {
+        "localhost": "local host"
+      }
+    }
+  },
+  "scenes": [
+    {
+      "kind": "hook",
+      "headline": "A WEBSITE. ONE COMMAND.",
+      "narration": "This folder can become a local website with one command. No upload. No account. No dashboard with fourteen tabs.",
+      "caption": "Serve a folder locally.",
+      "asset": null,
+      "duration": 7,
+      "visual": {
+        "template": "local_demo",
+        "mode": "terminal",
+        "prompt": "C:\\project>",
+        "command": "python -m http.server",
+        "result": "Serving on port 8000"
+      }
+    },
+    {
+      "kind": "problem",
+      "headline": "SKIP THE UPLOAD LOOP",
+      "narration": "Open a terminal inside the folder you want to share. Python already includes the small server we need.",
+      "caption": "Use the folder you intend to share.",
+      "asset": null,
+      "duration": 7,
+      "visual": {
+        "template": "local_demo",
+        "mode": "terminal",
+        "prompt": "C:\\project>",
+        "command": "python -m http.server",
+        "result": "HTTP server ready"
+      }
+    },
+    {
+      "kind": "demo",
+      "headline": "LOCALHOST:8000",
+      "narration": "Run the command on screen. Then open localhost colon eight thousand in your browser. Your files appear as a simple local site.",
+      "caption": "localhost:8000",
+      "asset": null,
+      "duration": 9,
+      "visual": {
+        "template": "local_demo",
+        "mode": "browser",
+        "address": "localhost:8000",
+        "title": "PROJECT FILES",
+        "items": ["index.html", "prototype.css", "assets/"]
+      }
+    },
+    {
+      "kind": "comparison",
+      "headline": "KEEP IT TRUSTED",
+      "narration": "Use this on a trusted network, and only serve files you mean to expose. It is a convenience tool, not a security strategy.",
+      "caption": "Trusted network. Intended files only.",
+      "asset": null,
+      "duration": 7,
+      "visual": {
+        "template": "local_demo",
+        "mode": "terminal",
+        "prompt": "C:\\safe-demo>",
+        "command": "python -m http.server",
+        "result": "Share deliberately"
+      }
+    },
+    {
+      "kind": "payoff",
+      "headline": "DONE? PRESS CONTROL C.",
+      "narration": "Press Control C when you are done. A useful server that also understands when to leave. Rare software manners.",
+      "caption": "Start fast. Stop cleanly.",
+      "asset": null,
+      "duration": 6,
+      "visual": {
+        "template": "local_demo",
+        "mode": "terminal",
+        "prompt": "C:\\project>",
+        "command": "Control C",
+        "result": "Server stopped"
+      }
+    }
+  ],
+  "review": {
+    "facts_checked": false,
+    "assets_licensed": false,
+    "final_approved": false
+  }
+}
