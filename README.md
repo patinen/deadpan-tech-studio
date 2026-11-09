@@ -168,6 +168,19 @@ flags are editable JSON/repository files; recordings, generated WAV files,
 models, MP4s, contact sheets and evidence manifests remain ignored. Command
 recipes are trusted repository configuration and must be reviewed before use.
 
+Task 05.1 adds three reusable content-aware compositions: `browser_demo`,
+`audio_demo`, and `automation_demo`. Their demo panels move down when a headline
+wraps, preventing long titles from colliding with footage. Production subtitles
+are measured with the configured font, receive explicit ASS line breaks, and use
+96-pixel left/right margins at 1080x1920.
+
+A scene may play a verified generated result with optional `edit.result_audio`,
+`result_audio_start`, `result_audio_duration`, and `result_audio_volume`. The
+excerpt is trimmed, delayed, and mixed with narration; projects without these
+fields preserve the previous audio path. Project 004 uses this to play the WAV
+that its capture recipe actually generated. Missing or unsupported result audio
+fails the render rather than silently substituting another sound.
+
 ### Linux / Server
 
 ```bash

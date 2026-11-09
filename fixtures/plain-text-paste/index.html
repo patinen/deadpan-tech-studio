@@ -4,8 +4,12 @@ h1{font-size:58px;margin:0 0 28px}.label{color:#c9f457;font-weight:bold;font-siz
 .box{margin:16px 0 42px;padding:30px;border:2px solid #526058;border-radius:18px;background:#171d24;min-height:100px}
 #source strong{color:#ff7968;font-size:38px}#source em{text-decoration:underline;color:#79b8ff}
 #target:focus{outline:6px solid rgba(201,244,87,.35)}.hint{color:#bac1c4;font-size:22px}
+#keys{position:fixed;left:50%;transform:translateX(-50%);bottom:42px;background:#c9f457;color:#0d1117;padding:16px 24px;border-radius:12px;font-weight:bold;opacity:0;transition:opacity .15s;white-space:nowrap}#keys.show{opacity:1}
 </style></head><body><main><h1>Paste without the formatting baggage.</h1>
 <div class="label">COPY THIS FORMATTED TEXT</div><div id="source" class="box"><strong>Quarterly plan</strong> &mdash; <em>review Friday</em></div>
 <div class="label">PASTE AS PLAIN TEXT</div><div id="target" class="box" contenteditable="true"></div>
 <p class="hint">Ctrl+Shift+V keeps the words. The surprise typography can remain unemployed.</p>
-</main></body></html>
+</main><div id="keys">CTRL + SHIFT + V</div><script>
+document.addEventListener('keydown',event=>{if(event.ctrlKey&&event.shiftKey&&event.key.toLowerCase()==='v'){
+ const keys=document.querySelector('#keys');keys.classList.add('show');setTimeout(()=>keys.classList.remove('show'),2200)}})
+</script></body></html>

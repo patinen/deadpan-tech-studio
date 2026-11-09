@@ -5,6 +5,10 @@ import json
 import re
 from pathlib import Path
 
+from PIL import Image, ImageDraw
+
+from .graphics import font
+
 from .utils import narr_hash
 
 
@@ -119,26 +123,63 @@ def _ass_time(seconds: float) -> str:
     return f"{hours}:{minutes:02d}:{secs:02d}.{hundredths:02d}"
 
 
+def wrap_ass_text(text: str, width: int, font_size: int) -> str:
+    """Insert deterministic ASS line breaks within a measured mobile-safe width."""
+    clean = " ".join(text.replace("\n", " ").split())
+    if not clean:
+        return ""
+    draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    face = font(font_size, True)
+    words = clean.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        if draw.textlength(word, font=face) > width:
+            if current:
+                lines.append(current)
+                current = ""
+            chunk = ""
+            for character in word:
+                if chunk and draw.textlength(chunk + character, font=face) > width:
+                    lines.append(chunk)
+                    chunk = character
+                else:
+                    chunk += character
+            current = chunk
+            continue
+        candidate = f"{current} {word}".strip()
+        if not current or draw.textlength(candidate, font=face) <= width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return r"\N".join(lines)
+
+
 def write_ass(path: Path, cues: list[dict], width: int, height: int) -> None:
     """Write safe-margin, high-contrast ASS subtitles for one scene."""
-    size = 31 if width == 540 else 62
+    size = 29 if width == 540 else 58
+    margin_h = 48 if width == 540 else 96
     margin_v = 92 if height == 960 else 184
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {width}
 PlayResY: {height}
-WrapStyle: 2
+WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Dynamic,Arial,{size},&H00F4F4ED,&H000000FF,&H00101518,&H00101518,-1,0,0,0,100,100,0,0,1,4,2,2,42,42,{margin_v},1
+Style: Dynamic,Arial,{size},&H00F4F4ED,&H000000FF,&H00101518,&H00101518,-1,0,0,0,100,100,0,0,1,4,2,2,{margin_h},{margin_h},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     events = []
     for cue in cues:
-        text = str(cue["text"]).replace("{", "(").replace("}", ")").replace("\n", " ")
+        text = str(cue["text"]).replace("{", "(").replace("}", ")")
+        text = wrap_ass_text(text, width - 2 * margin_h, size)
         emphasis = str(cue.get("emphasis", ""))
         if emphasis:
             match = re.search(re.escape(emphasis), text, re.IGNORECASE)

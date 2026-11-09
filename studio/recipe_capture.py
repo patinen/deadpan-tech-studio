@@ -81,8 +81,11 @@ def _command_capture(plan: dict, work: Path) -> tuple[Path, list[dict]]:
     evidence: list[dict] = []
     for step in plan.get("steps", []):
         label = step["label"]
+        if step.get("reset"):
+            transcript = []
         if step["type"] == "list":
-            names = sorted(path.name for path in sandbox.iterdir())
+            patterns = step.get("patterns", ["*"])
+            names = sorted({path.name for pattern in patterns for path in sandbox.glob(pattern)})
             lines = [f"$ {label}", *names]
             evidence.append({"step": label, "files": names})
         elif step["type"] == "run":

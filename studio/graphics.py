@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 W, H = 540, 960
 PANEL = (39, 329, 501, 702)
 FOCUS_PANEL = (16, 150, 524, 800)
+FOCUS_LAYOUTS = {"focus", "focus_alt", "browser_demo", "audio_demo", "automation_demo"}
 BG = (12, 15, 22)
 LIME = (201, 244, 87)
 PAPER = (244, 244, 237)
@@ -54,6 +55,24 @@ def text_lines(draw, xy, text: str, face, fill, width: int, line_height: int | N
         draw.text((x, y), line, font=face, fill=fill, stroke_width=0)
         y += line_height
     return y
+
+
+def scene_panel(scene: dict) -> tuple[int, int, int, int]:
+    """Return responsive demo geometry while preserving legacy inset projects."""
+    layout = scene.get("visual", {}).get("layout")
+    if layout not in FOCUS_LAYOUTS:
+        return PANEL
+    headline = scene.get("headline", "DEMONSTRATION").upper()
+    size = 38 if len(headline) <= 22 else 31
+    draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    line_count = max(1, min(2, len(wrap(headline, draw, font(size, True), 492))))
+    headline_bottom = 92 + line_count * int(size * 1.05)
+    top = max(150, headline_bottom + 18)
+    if layout == "audio_demo":
+        return (28, top, 512, 790)
+    if layout == "automation_demo":
+        return (16, top, 524, 810)
+    return (16, top, 524, 800)
 
 
 def _draw_placeholder(draw, scene, number: int):
@@ -137,19 +156,28 @@ def build_frame(scene: dict, number: int, count: int, brand: str | None = None,
     d = ImageDraw.Draw(img)
     d.rectangle((0,0, W,13), fill=LIME)
     layout = scene.get("visual", {}).get("layout")
-    if layout in {"focus", "focus_alt"}:
+    if layout in FOCUS_LAYOUTS:
         d.rounded_rectangle((24, 35, 67, 79), radius=9, fill=LIME)
         d.text((36, 45), "D/", font=font(23, True), fill=BG)
-        brand_color = LIME if layout == "focus_alt" else PAPER
+        brand_color = LIME if layout in {"focus_alt", "audio_demo"} else PAPER
         d.text((80, 44), brand[:24].upper(), font=font(18, True), fill=brand_color)
         d.text((450, 46), f"{number:02d}/{count:02d}", font=font(14, True), fill=MUTED)
-        if layout == "focus_alt":
+        if layout in {"focus_alt", "browser_demo", "audio_demo", "automation_demo"}:
             d.rectangle((24, 84, 190, 89), fill=LIME)
+        if layout == "browser_demo":
+            d.text((405, 82), "BROWSER", font=font(12, True), fill=LIME)
+        elif layout == "audio_demo":
+            for bar, height in enumerate((8, 18, 30, 16, 25, 11)):
+                x = 404 + bar * 17
+                d.rounded_rectangle((x, 86-height//2, x+8, 86+height//2), 3, fill=LIME)
+        elif layout == "automation_demo":
+            d.text((384, 82), "BEFORE  →  AFTER", font=font(11, True), fill=LIME)
         headline = scene.get("headline", "DEMONSTRATION").upper()
         size = 38 if len(headline) <= 22 else 31
         text_lines(d, (24, 92), headline, font(size, True), PAPER, 492,
                    line_height=int(size*1.05), max_lines=2)
-        d.rounded_rectangle(FOCUS_PANEL, radius=18, fill=(18, 23, 30),
+        panel = scene_panel(scene)
+        d.rounded_rectangle(panel, radius=18, fill=(18, 23, 30),
                             outline=(75, 88, 80), width=2)
         d.line((24, 885, 516, 885), fill=(67, 75, 72), width=2)
         status = "DRAFT · NOT APPROVED" if draft else "ORIGINAL TECH EXPLAINERS"
