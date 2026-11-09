@@ -126,6 +126,15 @@ class CaptureTests(unittest.TestCase):
         self.assertFalse(errors)
         self.assertTrue(any("capture" in warning.lower() for warning in warnings))
 
+    def test_sample_is_audience_first_and_result_led(self):
+        project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
+        self.assertGreaterEqual(sum(scene["duration"] for scene in project["scenes"]), 20)
+        self.assertLessEqual(sum(scene["duration"] for scene in project["scenes"]), 28)
+        hook = project["scenes"][0]
+        self.assertTrue(hook["asset"].endswith("browser-real.mp4"))
+        self.assertGreaterEqual(hook["edit"]["asset_start"], 2.0)
+        self.assertGreater(hook["edit"]["zoom"], 1.0)
+
     def test_callouts_must_fit_inside_scene(self):
         project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())
         invalid = copy.deepcopy(project)

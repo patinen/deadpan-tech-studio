@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from studio.quality import check
-from studio.render import PRESETS
+from studio.render import PRESETS, focal_zoom_filter
 from studio.speech import narration_config
 from studio.subtitles import (build_manifest, group_phrases, load_or_create_manifest,
                               validate_manifest)
@@ -14,6 +14,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PipelineTests(unittest.TestCase):
+    def test_focal_zoom_is_optional_and_targets_configured_region(self):
+        self.assertEqual(focal_zoom_filter({}, 1000, 1200), "")
+        value = focal_zoom_filter({"zoom": 1.3, "focus_x": 0.25, "focus_y": 0.4},
+                                  1000, 1200)
+        self.assertIn("z='1.300'", value)
+        self.assertIn("iw*0.250", value)
+        self.assertIn("ih*0.400", value)
+
     def setUp(self):
         self.project = json.loads((ROOT / "content" / "001-stop-copy-pasting.json").read_text())
 
