@@ -58,6 +58,8 @@ python studio.py render content/001-stop-copy-pasting.json --preset production -
 
 Each cue uses seconds relative to its scene. Edit `start`, `end`, or `text`, keeping cues ordered and within the scene duration. If narration changes, rendering rejects the stale manifest instead of silently showing mismatched text. Timing is deterministic phrase-level timing, based on measured scene audio unless manually edited; it is not claimed to be word-level transcription.
 
+The default cache manifest refreshes automatically when measured narration replaces a silent preview or its measured duration changes. Explicit files passed with `--subtitles` are never overwritten in that situation; rendering stops and asks the editor to update them.
+
 ### Linux / Server
 
 ```bash

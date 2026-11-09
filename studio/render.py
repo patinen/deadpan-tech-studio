@@ -62,16 +62,20 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
     approved = bool(project.get("review", {}).get("final_approved"))
     warnings = []
     scene_files: list[Path] = []
-    actual_times, voices = [], []
+    actual_times, subtitle_times, voices = [], [], []
     for idx, scene in enumerate(project["scenes"]):
         voice = locate_voice(project, idx, scene["narration"])
         requested_duration = float(scene.get("duration", 6))
-        duration = max(requested_duration, duration_seconds(voice) + 0.40) if voice else requested_duration
+        voice_duration = duration_seconds(voice) if voice else None
+        duration = max(requested_duration, voice_duration + 0.40) if voice_duration else requested_duration
         voices.append(voice)
         actual_times.append(duration)
+        subtitle_times.append(voice_duration + 0.20 if voice_duration else requested_duration)
+    custom_subtitles = subtitle_manifest is not None
     subtitle_manifest = subtitle_manifest or ROOT / "cache" / slug / "subtitles.json"
     subtitles = load_or_create_manifest(
-        subtitle_manifest, project, actual_times, [voice is not None for voice in voices]
+        subtitle_manifest, project, subtitle_times, [voice is not None for voice in voices],
+        auto_refresh=not custom_subtitles,
     )
     for idx, scene in enumerate(project["scenes"]):
         path = resolve_asset(scene.get("asset"), project_file)

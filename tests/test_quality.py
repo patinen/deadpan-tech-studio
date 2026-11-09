@@ -5,7 +5,8 @@ from pathlib import Path
 
 from studio.quality import check
 from studio.render import PRESETS
-from studio.subtitles import build_manifest, group_phrases, validate_manifest
+from studio.subtitles import (build_manifest, group_phrases, load_or_create_manifest,
+                              validate_manifest)
 from studio.utils import narr_hash, slugify
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +66,32 @@ class PipelineTests(unittest.TestCase):
         changed["scenes"][0]["narration"] += " Changed."
         with self.assertRaisesRegex(ValueError, "stale"):
             validate_manifest(manifest, changed, durations)
+
+    def test_nominal_manifest_is_not_silently_used_for_audio(self):
+        import tempfile
+
+        durations = [float(scene["duration"]) for scene in self.project["scenes"]]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "subtitles.json"
+            load_or_create_manifest(path, self.project, durations, [False] * len(durations))
+            with self.assertRaisesRegex(ValueError, "narration audio is now available"):
+                load_or_create_manifest(path, self.project, durations, [True] * len(durations))
+
+    def test_default_manifest_refreshes_when_measured_audio_arrives(self):
+        import tempfile
+
+        nominal = [float(scene["duration"]) for scene in self.project["scenes"]]
+        measured = [duration - 1 for duration in nominal]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "subtitles.json"
+            load_or_create_manifest(path, self.project, nominal, [False] * len(nominal))
+            refreshed = load_or_create_manifest(
+                path, self.project, measured, [True] * len(measured), auto_refresh=True
+            )
+            self.assertTrue(all(
+                scene["timing_source"] == "measured_audio" for scene in refreshed["scenes"]
+            ))
+            self.assertEqual(refreshed["scenes"][0]["duration"], measured[0])
 
 
 if __name__ == "__main__":
