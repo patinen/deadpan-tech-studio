@@ -1,11 +1,19 @@
 import json
 import copy
+import socket
+import subprocess
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
+from unittest import mock
 import tempfile
 import unittest
 from pathlib import Path
 
-from studio.capture import HOST, PORT, demo_command, prepare_demo_site
+from studio.capture import (HOST, PORT, _stop_process, _wait_for_server,
+                            assert_port_available, demo_command, prepare_demo_site,
+                            stop_transcript)
 from studio.quality import check
+from studio.visual_qa import sample_timestamps
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +34,88 @@ class CaptureTests(unittest.TestCase):
             html = (Path(directory) / "index.html").read_text(encoding="utf-8")
             self.assertIn("LOCALHOST-ONLY DEMO", html)
             self.assertIn("--bind 127.0.0.1", html)
+            self.assertIn("[hidden]{display:none!important}",
+                          (Path(directory) / "style.css").read_text(encoding="utf-8"))
+
+    def test_playwright_result_is_hidden_until_click(self):
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            self.skipTest("Playwright is not installed")
+        with tempfile.TemporaryDirectory() as directory:
+            site = Path(directory)
+            prepare_demo_site(site)
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.goto((site / "index.html").as_uri())
+                result = page.locator("#result")
+                self.assertTrue(result.is_hidden())
+                page.locator("#inspect").click()
+                self.assertTrue(result.is_visible())
+                browser.close()
+
+    def test_port_conflict_is_rejected_before_capture(self):
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        try:
+            listener.bind((HOST, 0))
+            port = listener.getsockname()[1]
+            listener.listen(1)
+            with self.assertRaisesRegex(RuntimeError, "already in use"):
+                assert_port_available(HOST, port)
+            self.assertEqual(listener.getsockname()[1], port)
+        finally:
+            listener.close()
+
+    def test_readiness_rejects_unrelated_server(self):
+        class UnrelatedHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"unrelated local service"
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                pass
+
+        server = ThreadingHTTPServer((HOST, 0), UnrelatedHandler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        process = mock.Mock()
+        process.poll.return_value = None
+        try:
+            with self.assertRaisesRegex(RuntimeError, "unrelated content"):
+                _wait_for_server(f"http://{HOST}:{server.server_port}/", "our-marker",
+                                 process, timeout=1)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_cleanup_kills_process_after_interrupt_timeout(self):
+        process = mock.Mock()
+        process.poll.return_value = None
+        process.wait.side_effect = [subprocess.TimeoutExpired("demo", 4), 9]
+        process.returncode = -9
+        exit_code, forced = _stop_process(process)
+        self.assertTrue(forced)
+        self.assertEqual(exit_code, -9)
+        process.kill.assert_called_once()
+
+    def test_stop_transcript_hides_platform_specific_exit_code(self):
+        self.assertEqual(stop_transcript(3221225786, False),
+                         "Process stopped by Control C")
+        self.assertIn("timed out", stop_transcript(-9, True))
+
+    def test_contact_sheet_timestamps_cover_video_without_edges(self):
+        timestamps = sample_timestamps(40.0, 8)
+        self.assertEqual(len(timestamps), 8)
+        self.assertGreaterEqual(timestamps[0], 0)
+        self.assertLess(timestamps[-1], 40.0)
+        self.assertEqual(timestamps, sorted(timestamps))
 
     def test_task_03_project_uses_real_capture_assets_and_focus_layout(self):
         project = json.loads((ROOT / "content" / "002-instant-local-file-server.json").read_text())

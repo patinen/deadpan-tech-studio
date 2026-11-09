@@ -117,6 +117,23 @@ python studio.py build content/002-instant-local-file-server.json
 python studio.py build content/002-instant-local-file-server.json --capture
 ```
 
+Capture refuses to start when port 8000 is already occupied, verifies a unique
+marker before treating the server as ready, and stops only the subprocess it
+started. A failed run leaves the previous successful recordings intact. The
+generated result panel is also tested in a real browser: it remains hidden until
+the demo button is clicked.
+
+After rendering, create a repeatable representative-frame review artifact:
+
+```powershell
+python studio.py visual-qa content/002-instant-local-file-server.json `
+  --video output/002-instant-local-file-server-task04.mp4
+```
+
+This writes an ignored `output/<project>.contact-sheet.jpg` plus a machine-readable
+`output/<project>.visual-qa.json`. The contact sheet supports human review; it does
+not automatically approve the video or replace full playback on a phone.
+
 Generated fixture files, recordings, evidence, narration, subtitle timing, rendered videos, thumbnails, and reports remain under ignored `cache/` and `output/` directories. No browser profile, personal file, API credential, or generated media is committed.
 
 Scenes with `visual.layout: "focus"` give the authentic recording most of the portrait canvas. Optional `edit.asset_start`, `edit.motion`, and timed `edit.callouts` provide deliberate cuts and short emphasis without applying a constant zoom to every scene. Existing projects without these fields retain the original inset layout.
