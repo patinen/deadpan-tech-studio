@@ -62,7 +62,7 @@ EDITORIAL_RESPONSE_SCHEMA = {
                           "items": {"type": "string"}},
         "sources": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "script": {"type": "array", "minItems": 3, "maxItems": 6,
-                   "description": "Complete narration in 3–6 lines and 45–85 total words.",
+                   "description": "Complete narration in 3–6 lines. Target 60–70 total words; preferred range 45–85.",
                    "items": {"type": "string"}},
         "shot_plan": {
             "type": "array", "minItems": 3, "maxItems": 6,
@@ -312,8 +312,6 @@ def validate_analysis(value: dict, allowed_urls: list[str]) -> dict:
             or any(not isinstance(line, str) or not line.strip() for line in script)):
         raise EditorialError("Editorial script must contain 3–6 non-empty narration lines")
     word_count = sum(len(line.split()) for line in script)
-    if not 45 <= word_count <= 85:
-        raise EditorialError("Editorial script must be 45–85 words for a 20–30 second target")
     if (not isinstance(shots, list) or len(shots) != len(script)
             or any(not isinstance(shot, dict) or isinstance(shot.get("seconds"), bool)
                    or not isinstance(shot.get("seconds"), (int, float))
@@ -323,6 +321,17 @@ def validate_analysis(value: dict, allowed_urls: list[str]) -> dict:
     duration = sum(shot["seconds"] for shot in shots)
     if not 20 <= duration <= 30:
         raise EditorialError("Shot plan duration must be 20–30 seconds")
+    words_per_second = word_count / duration
+    if not 30 <= word_count <= 100 or not 1.2 <= words_per_second <= 3.8:
+        raise EditorialError(
+            f"Editorial script is unusable at {word_count} words over {duration:g} seconds "
+            f"({words_per_second:.2f} words/second); require 30–100 words and plausible narration pacing")
+    warnings = []
+    if not 45 <= word_count <= 85:
+        warnings.append(
+            f"Script is {word_count} words over {duration:g} seconds; the preferred editorial target is "
+            "45–85 words. Human pacing and completeness review is required.")
+    value["editorial_warnings"] = warnings
     value["sources"] = [canonicalize_url(_verified_https_url(url)) for url in sources]
     return value
 
@@ -344,6 +353,8 @@ def build_production_brief(candidate: dict, analysis: dict, *, analysis_mode: st
     scenes = [{"seconds": shot["seconds"], "narration": line, "shot": shot["shot"]}
               for line, shot in zip(script, analysis["shot_plan"])]
     blockers = list(analysis["uncertainties"])
+    editorial_warnings = list(analysis.get("editorial_warnings", []))
+    blockers.extend(f"Editorial warning: {warning}" for warning in editorial_warnings)
     blockers.append("Human fact, rights, script, and final approvals remain incomplete.")
     if not demo_verified:
         blockers.insert(0, "Real product access and the proposed interaction have not been captured or verified.")
@@ -357,6 +368,7 @@ def build_production_brief(candidate: dict, analysis: dict, *, analysis_mode: st
             "script_target_seconds": sum(scene["seconds"] for scene in scenes), "script": script, "shots": scenes,
             "required_real_demonstrations": [analysis["visual_demonstration"]],
             "availability": analysis["availability"], "claims": analysis["claims"],
+            "editorial_warnings": editorial_warnings,
             "unverified_claims_and_blockers": blockers,
             "access_and_licensing": {"product_access": analysis["availability"],
                                      "capture_rights": "Operator must capture their own account and harmless data; product UI rights require human review."},

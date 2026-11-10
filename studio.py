@@ -53,6 +53,8 @@ def main():
     d.add_argument("--report", help="Scout JSON report containing the selected candidate")
     d.add_argument("--candidate", help="Candidate id, exact title, or canonical URL")
     d.add_argument("--fixture", help="Offline article + validated analysis fixture")
+    d.add_argument("--diagnostic", help="Saved diagnostic or manually revised analysis JSON; no API call")
+    d.add_argument("--source", action="append", help="Allowed evidence URL for diagnostic replay (repeatable)")
     d.add_argument("--ai", action="store_true", help="Analyze fetched article content with bounded Gemini JSON")
     d.add_argument("--model", default=None)
     d.add_argument("--output", required=True)
@@ -121,9 +123,26 @@ def main():
             print("No demos executed. Select and verify a proposal manually before scripting.")
             return 0
         if args.cmd == "develop":
+            if args.fixture and args.diagnostic:
+                raise ValueError("develop accepts either --fixture or --diagnostic, not both")
             if args.fixture:
                 candidate, article, analysis = load_fixture(Path(args.fixture).resolve())
                 mode = "offline-fixture"
+            elif args.diagnostic:
+                candidate = None
+                sources = args.source or []
+                if args.report or args.candidate:
+                    if not args.report or not args.candidate:
+                        raise ValueError("diagnostic development requires both --report and --candidate when either is supplied")
+                    report = json.loads(Path(args.report).resolve().read_text(encoding="utf-8"))
+                    candidate = select_candidate(report, args.candidate)
+                    sources = [evidence["url"] for evidence in candidate.get("evidence", [])]
+                if not sources:
+                    raise ValueError("diagnostic development requires --source or a selected Scout candidate")
+                analysis = replay_model_response(Path(args.diagnostic).resolve(), sources)
+                candidate = candidate or {"id": slugify(analysis["actual_feature"]),
+                                          "working_title": analysis["actual_feature"]}
+                mode = "offline-replay"
             else:
                 if not args.report or not args.candidate:
                     raise ValueError("develop requires --report and --candidate, or --fixture")

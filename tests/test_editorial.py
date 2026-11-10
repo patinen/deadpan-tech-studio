@@ -126,6 +126,44 @@ class EditorialTests(unittest.TestCase):
         self.assertEqual("", checked["rejection_reason"])
         self.assertEqual([], checked["availability"]["restrictions"])
 
+    def test_real_observed_39_word_response_is_warning_not_failure(self):
+        path = ROOT / "fixtures" / "editorial" / "gemini-39-word-response.json"
+        checked = replay_model_response(path, [
+            "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"])
+        self.assertEqual(39, sum(len(line.split()) for line in checked["script"]))
+        self.assertEqual(1, len(checked["editorial_warnings"]))
+        self.assertIn("preferred editorial target", checked["editorial_warnings"][0])
+        brief = build_production_brief({"id": "gemini-files", "working_title": "Gemini files"},
+                                       checked, analysis_mode="offline-replay")
+        self.assertTrue(brief["publication_blocked"])
+        self.assertTrue(any("Editorial warning" in blocker for blocker in brief["publication_blockers"]))
+
+    def test_clearly_unusable_script_still_fails(self):
+        too_short = analysis(
+            script=["Only a few words.", "Still far too short.", "No useful ending here."],
+            shot_plan=[{"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 6, "shot": "Real footage."}])
+        with self.assertRaisesRegex(EditorialError, "script is unusable"):
+            validate_analysis(too_short, [SOURCE])
+        too_fast = analysis(
+            script=["word " * 33, "word " * 33, "word " * 33],
+            shot_plan=[{"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 6, "shot": "Real footage."}])
+        with self.assertRaisesRegex(EditorialError, "script is unusable"):
+            validate_analysis(too_fast, [SOURCE])
+
+    def test_manual_script_revision_revalidates_without_mutating_file(self):
+        revised = analysis()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manual-revision.json"
+            path.write_text(json.dumps(revised, indent=2), encoding="utf-8")
+            before = path.read_text(encoding="utf-8")
+            checked = replay_model_response(path, [SOURCE])
+            self.assertEqual([], checked["editorial_warnings"])
+            self.assertEqual(before, path.read_text(encoding="utf-8"))
+
     def test_missing_or_object_restrictions_remain_invalid(self):
         missing = analysis()
         del missing["availability"]["restrictions"]

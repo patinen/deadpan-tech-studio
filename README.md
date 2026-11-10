@@ -235,6 +235,17 @@ under ignored `diagnostics/editorial/` and can be replayed offline:
 python studio.py replay-editorial diagnostics/editorial/response.json `
   --source https://example.com/allowed-evidence
 ```
+
+The 45–85 word range is a preferred editorial target. Modest deviations with
+plausible 20–30 second pacing produce a human-review warning; clearly unusable
+scripts still fail. Recover a valid diagnostic directly into a blocked brief
+without another model call:
+
+```powershell
+python studio.py develop --diagnostic diagnostics/editorial/response.json `
+  --report research/scout-report.json --candidate candidate-id `
+  --output editorial/recovered-draft.json
+```
 Known legacy Google Workspace `http://` article URLs are upgraded to HTTPS and
 must return valid HTML; other HTTP sources and cross-host redirects are rejected.
 

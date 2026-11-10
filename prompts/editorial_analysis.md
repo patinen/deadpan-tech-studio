@@ -5,7 +5,8 @@ facts. Do not invent sources, demand, metrics, access, capabilities, or demonstr
 Return one JSON object with: classification, accepted, rejection_reason,
 actual_feature, viewer_problem, realistic_benefit, target_audience,
 visual_demonstration, opening_hook, availability, claims, uncertainties, sources.
-Also return `script` (3–6 narration lines, 45–85 total words) and `shot_plan`
+Also return `script` (3–6 narration lines, target approximately 60–70 total
+words; 45–85 is the preferred acceptable range) and `shot_plan`
 (one object per script line with `seconds` and a precise real visual instruction;
 total duration 20–30 seconds). Do not use mock product footage.
 

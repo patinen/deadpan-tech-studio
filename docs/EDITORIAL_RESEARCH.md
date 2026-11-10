@@ -28,6 +28,10 @@ The request supplies a complete JSON Schema through
 defines required fields, classification/status/confidence enums, string-only
 arrays, cited-claim objects, and numeric shot durations. Local semantic validation
 still runs after generation; structured output is not treated as fact checking.
+The prompt targets approximately 60–70 narration words. The preferred range is
+45–85 words, but a 30–100 word script with a plausible 1.2–3.8 words/second pace
+and valid 20–30 second shot plan may proceed with an explicit editorial warning.
+More severe deviations remain errors. The workflow never pads scripts.
 
 HTTP 429, 500, and 503 responses receive at most two retries after one- and
 two-second delays. Other API errors and schema failures are not retried. If JSON
@@ -47,6 +51,24 @@ Only two representation differences are normalized: an accepted response may use
 restrictions value is treated as `[]`. Missing fields, objects in place of arrays,
 and unsupported factual structures remain errors.
 
+To recover a failed generation without paying for another call, develop directly
+from its unchanged diagnostic and the original Scout candidate:
+
+```powershell
+python studio.py develop `
+  --diagnostic diagnostics/editorial/gemini-editorial-....json `
+  --report research/scout-....json `
+  --candidate create-preview-and-edit-files-directly-in-the-gemini-app `
+  --output editorial/recovered-gemini-files.json
+```
+
+Alternatively pass verified `--source` URLs instead of a Scout report. For manual
+revision, copy the diagnostic or its `raw_model_output` JSON to a new file, edit
+only evidence-supported fields, then run the same command with that file. The
+original diagnostic is never modified. Offline development performs the same
+citation, availability, timing and safety checks, adds any pacing warning to the
+blocked brief, and makes no API request.
+
 Legacy Scout archives may contain `http://workspaceupdates.googleblog.com`
 article links. That recognized host is upgraded before the request, and the HTTPS
 response itself must succeed. The fetcher never downgrades HTTPS, rejects other
@@ -56,8 +78,8 @@ HTTPS redirect chain.
 The model receives the selected Scout candidate, the fetched article text, and an
 explicit allow-list containing that article URL. Validation rejects invented
 citations, unsupported claims without evidence, unknown/unavailable features
-marked accepted, unsuitable categories marked accepted, vague fields, scripts
-outside 45–85 words, and shot plans outside 20–30 seconds.
+marked accepted, unsuitable categories marked accepted, vague fields, clearly
+unusable scripts, and shot plans outside 20–30 seconds.
 
 For deterministic offline testing:
 
