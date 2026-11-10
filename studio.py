@@ -250,7 +250,7 @@ def main():
             print(f"Rendered: {output} ({output.stat().st_size / 1024 / 1024:.1f} MB)")
             for warning in render_warnings:
                 print("WARNING:", warning)
-            print("This is a DRAFT until facts, footage rights, and final quality are approved.")
+            print("This is a DRAFT until the quality report has no blockers and every required human approval is complete.")
         return 0
     except (ValueError, FileNotFoundError, RuntimeError, KeyError) as exc:
         print("ERROR:", exc, file=sys.stderr)

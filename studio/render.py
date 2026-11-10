@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from .graphics import FOCUS_LAYOUTS, PANEL, W, H, build_frame, paste_still, scene_panel
 from .subtitles import load_or_create_manifest, write_ass, write_callouts_ass
-from .quality import check, is_publication_approved
+from .quality import publication_readiness
 from .utils import ROOT, assert_tool, duration_seconds, run, slugify
 
 STILL_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -92,7 +92,6 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
     work.mkdir(parents=True, exist_ok=True)
     output = output or ROOT / "output" / f"{slug}.mp4"
     output.parent.mkdir(parents=True, exist_ok=True)
-    approved = is_publication_approved(project)
     warnings = []
     scene_files: list[Path] = []
     actual_times, subtitle_times, voices = [], [], []
@@ -109,6 +108,9 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
         voices.append(voice)
         actual_times.append(duration)
         subtitle_times.append(voice_duration + 0.20 if voice_duration else requested_duration)
+    render_blockers = ([] if all(voices) else ["Narration audio is missing for one or more scenes"])
+    readiness = publication_readiness(project, extra_blockers=render_blockers)
+    approved = readiness["ready"]
     custom_subtitles = subtitle_manifest is not None
     subtitle_manifest = subtitle_manifest or ROOT / "cache" / slug / "subtitles.json"
     subtitles = load_or_create_manifest(
@@ -220,27 +222,25 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
     thumbnail = output.parent / f"{slug}.thumbnail.jpg"
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "1.2",
          "-i", str(output), "-frames:v", "1", "-q:v", "2", str(thumbnail)])
-    quality_errors, quality_warnings = check(project, require_approval=True)
     voice_manifest = ROOT / "cache" / slug / "voice_manifest.json"
     voice_info = json.loads(voice_manifest.read_text(encoding="utf-8")) if voice_manifest.exists() else {}
     if voice_info.get("engine") == "espeak":
         warnings.append("Offline eSpeak narration is a rough editorial reference, not release-quality voice")
-    blockers = quality_errors + ([] if all(voices) else ["Narration audio is missing for one or more scenes"])
     capture_manifest = ROOT / "cache" / slug / "capture" / "capture-manifest.json"
     capture_evidence = (json.loads(capture_manifest.read_text(encoding="utf-8"))
                         if capture_manifest.exists() else None)
     details = {
         "project": str(project_file), "video": str(output), "thumbnail": str(thumbnail),
         "duration_seconds": sum(actual_times), "audio_present": all(voices),
-        "status": "approved" if approved else "draft", "preset": preset,
+        "status": readiness["status"], "preset": preset,
         "width": config["width"], "height": config["height"],
         "subtitle_manifest": str(subtitle_manifest), "narration": voice_info,
         "result_audio_scenes": [index for index, scene in enumerate(project["scenes"])
                                 if scene.get("edit", {}).get("result_audio")],
         "capture_evidence": capture_evidence,
         "media": probe_media(output),
-        "publication_ready": not blockers, "blockers": blockers,
-        "warnings": quality_warnings + warnings,
+        "publication_ready": readiness["ready"], "blockers": readiness["blockers"],
+        "warnings": readiness["warnings"] + warnings,
     }
     (output.parent / f"{slug}.quality.json").write_text(
         json.dumps(details, indent=2, ensure_ascii=False), encoding="utf-8"

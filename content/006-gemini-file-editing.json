@@ -98,10 +98,17 @@
   ],
   "editorial": {
     "quality_gate": {
-      "factual_validity": {
+      "evidence_integrity": {
         "score": 100,
         "status": "pass",
         "reasons": []
+      },
+      "factual_validity": {
+        "score": null,
+        "status": "human_review_required",
+        "reasons": [
+          "Citation linkage does not establish that the claims are factually correct."
+        ]
       },
       "production_readiness": {
         "score": 56,

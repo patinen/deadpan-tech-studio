@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import shutil
 from datetime import datetime, timezone
@@ -89,8 +90,10 @@ def evaluate_editorial(brief: dict) -> dict:
         suggestions.append("Assign a distinct purpose to every shot: result, input/action, correction, payoff.")
     creative_score = max(0, 100 - len(creative_reasons) * 22)
     return {
-        "factual_validity": {"score": factual_score, "status": "pass" if not factual_reasons else "blocked",
-                             "reasons": factual_reasons},
+        "evidence_integrity": {"score": factual_score, "status": "pass" if not factual_reasons else "blocked",
+                               "reasons": factual_reasons},
+        "factual_validity": {"score": None, "status": "human_review_required",
+                             "reasons": ["Citation linkage does not establish that the claims are factually correct."]},
         "production_readiness": {"score": production_score, "status": "ready_for_capture" if not production_reasons else "blocked",
                                  "reasons": production_reasons},
         "creative_quality": {"score": creative_score, "status": "human_review_required" if creative_reasons else "candidate",
@@ -112,8 +115,8 @@ def _headline(narration: str, index: int, total: int) -> str:
 def convert_brief(brief: dict, *, project_id: str | None = None,
                   source_brief: str | None = None) -> dict:
     gate = evaluate_editorial(brief)
-    if gate["factual_validity"]["status"] != "pass":
-        raise BridgeError("Editorial brief failed factual integrity: " + "; ".join(gate["factual_validity"]["reasons"]))
+    if gate["evidence_integrity"]["status"] != "pass":
+        raise BridgeError("Editorial brief failed evidence integrity: " + "; ".join(gate["evidence_integrity"]["reasons"]))
     shots = brief.get("shots", [])
     if not isinstance(shots, list) or len(shots) < 3 or any(not isinstance(shot, dict) for shot in shots):
         raise BridgeError("Editorial brief requires at least three shots")
@@ -129,6 +132,8 @@ def convert_brief(brief: dict, *, project_id: str | None = None,
             seconds = float(shot["seconds"])
         except (KeyError, TypeError, ValueError) as exc:
             raise BridgeError(f"Editorial shot {index + 1} has an invalid duration") from exc
+        if not math.isfinite(seconds):
+            raise BridgeError(f"Editorial shot {index + 1} has an invalid duration")
         if not isinstance(shot.get("shot"), str) or not shot["shot"].strip():
             raise BridgeError(f"Editorial shot {index + 1} requires a visual instruction")
         scenes.append({
@@ -212,6 +217,10 @@ def intake_recording(project_path: Path, shot_id: str, media_path: Path, *,
     except (KeyError, TypeError, ValueError) as exc:
         raise BridgeError("Recording has no readable media duration") from exc
     clip_duration = float(duration if duration is not None else scene["duration"])
+    numeric_values = (media_duration, float(start), clip_duration, float(zoom),
+                      float(focus_x), float(focus_y))
+    if not all(math.isfinite(value) for value in numeric_values):
+        raise BridgeError("Recording duration, trim, and reframe values must be finite numbers")
     if start < 0 or not 1 <= clip_duration <= 40 or start + clip_duration > media_duration + 0.02:
         raise BridgeError("Requested trim must be 1–40 seconds and remain inside the recording")
     if not 1 <= zoom <= 2 or not 0 <= focus_x <= 1 or not 0 <= focus_y <= 1:

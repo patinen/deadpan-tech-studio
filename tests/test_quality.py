@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from studio.quality import check
+from studio.quality import check, is_publication_approved
 from studio.render import PRESETS, focal_zoom_filter, result_audio_filter
 from studio.graphics import scene_panel
 from studio.speech import narration_config
@@ -71,6 +71,7 @@ class PipelineTests(unittest.TestCase):
         approved["review"] = {"facts_checked": True, "assets_licensed": True, "final_approved": True}
         errors, warnings = check(approved, require_approval=True)
         self.assertFalse(errors)
+        self.assertTrue(is_publication_approved(approved))
 
     def test_missing_narration_is_error(self):
         project = copy.deepcopy(self.project)

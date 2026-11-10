@@ -68,6 +68,18 @@ rights, creative quality, and demonstration. Editorial projects require all of
 `creative_approved`, and `final_approved` before strict review can pass. No CLI
 command sets those fields automatically.
 
+`editorial.publication_blocked` is an independent fail-closed gate. Once the
+recordings and all reviews are complete, run strict review and resolve every
+reported item. A human may then remove only the resolved strings from
+`editorial.publication_blockers` and explicitly set `publication_blocked` to
+`false`; run strict review again before rendering. A non-empty blocker list or a
+value other than explicit `false` keeps the watermark and quality report in
+draft status. The renderer never clears either field.
+
+The editorial quality report calls URL/citation checks `evidence_integrity`.
+Matching citations establish traceability, not truth. `factual_validity` remains
+`human_review_required` until the operator completes `review.facts_checked`.
+
 ## Remaining pilot work
 
 The committed pilot project is a blocked integration example, not a finished

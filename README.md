@@ -333,6 +333,10 @@ Do **not** automatically upload drafts. Only when a human has checked the facts,
 Editorial-conversion projects additionally require `script_approved`,
 `demo_verified`, and `creative_approved`. The bridge initializes every flag to
 false, and footage intake resets relevant approvals; it never auto-approves.
+Required footage must also exist and match its intake path and SHA-256 evidence.
+Finally, a human must resolve and remove each explicit editorial blocker and set
+`editorial.publication_blocked` to `false`. Until then the render watermark,
+quality-report status, `publication_ready`, and blockers all remain in draft.
 
 Check `python studio.py review content/your-video.json --strict` before publication. Draft renders are marked as drafts. Review flags are assertions by the operator, not actual automated content moderation.
 

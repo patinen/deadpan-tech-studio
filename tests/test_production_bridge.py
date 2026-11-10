@@ -1,12 +1,15 @@
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from studio.production_bridge import (BridgeError, convert_brief, evaluate_editorial,
                                       intake_recording, save_project)
 from studio.graphics import build_frame
-from studio.quality import check, is_publication_approved
+from studio.quality import check, is_publication_approved, publication_readiness
+from studio.render import render
 
 
 SOURCE = "https://example.test/official-feature"
@@ -50,7 +53,9 @@ class ProductionBridgeTests(unittest.TestCase):
         value["script"][0] = "See how this feature works."
         value["viewer_pain_point"] = "Switching apps causes friction."
         result = evaluate_editorial(value)
-        self.assertEqual("pass", result["factual_validity"]["status"])
+        self.assertEqual("pass", result["evidence_integrity"]["status"])
+        self.assertEqual("human_review_required", result["factual_validity"]["status"])
+        self.assertIsNone(result["factual_validity"]["score"])
         self.assertEqual("blocked", result["production_readiness"]["status"])
         self.assertEqual("human_review_required", result["creative_quality"]["status"])
         self.assertTrue(result["revision_suggestions"])
@@ -61,7 +66,7 @@ class ProductionBridgeTests(unittest.TestCase):
         value["claims"] = ["not-an-object", {"text": "Missing evidence", "evidence_urls": None}]
         value["shots"][0]["seconds"] = "eventually"
         result = evaluate_editorial(value)
-        self.assertEqual("blocked", result["factual_validity"]["status"])
+        self.assertEqual("blocked", result["evidence_integrity"]["status"])
         self.assertIn("invalid duration", " ".join(result["production_readiness"]["reasons"]))
 
     def test_conversion_preserves_claims_sources_and_blocks_all_reviews(self):
@@ -83,7 +88,97 @@ class ProductionBridgeTests(unittest.TestCase):
         self.assertFalse(is_publication_approved(project))
         for key in project["review"]:
             project["review"][key] = True
-        self.assertTrue(is_publication_approved(project))
+        self.assertFalse(is_publication_approved(project))
+
+    def _attach_footage(self, project, root, shot_ids):
+        for shot_id in shot_ids:
+            path = root / f"{shot_id}.mp4"
+            path.write_bytes(f"real-{shot_id}".encode())
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            scene = next(scene for scene in project["scenes"] if scene["id"] == shot_id)
+            scene["asset"] = str(path)
+            project["editorial"]["demo_intake"][shot_id] = {
+                "imported_asset": str(path), "sha256": digest,
+                "operator_owned": True, "verified_by_human": False,
+            }
+
+    def _approve_reviews(self, project):
+        for key in project["review"]:
+            project["review"][key] = True
+
+    def test_publication_readiness_requires_every_clip_evidence_and_demo_approval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = convert_brief(brief())
+            self._approve_reviews(project)
+            self.assertFalse(publication_readiness(project)["ready"])
+
+            self._attach_footage(project, root, ["shot-01"])
+            self.assertFalse(publication_readiness(project)["ready"])
+
+            self._attach_footage(project, root, ["shot-02", "shot-03"])
+            project["review"]["demo_verified"] = False
+            project["editorial"]["publication_blocked"] = False
+            project["editorial"]["publication_blockers"] = []
+            self.assertFalse(publication_readiness(project)["ready"])
+
+            project["review"]["demo_verified"] = True
+            readiness = publication_readiness(project)
+            self.assertTrue(readiness["ready"])
+            self.assertEqual("approved", readiness["status"])
+
+            Path(project["scenes"][0]["asset"]).write_bytes(b"tampered-after-intake")
+            readiness = publication_readiness(project)
+            self.assertFalse(readiness["ready"])
+            self.assertTrue(any("hash does not match" in item for item in readiness["blockers"]))
+
+    def test_explicit_editorial_blocker_cannot_silently_approve(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = convert_brief(brief())
+            self._attach_footage(project, Path(directory), ["shot-01", "shot-02", "shot-03"])
+            self._approve_reviews(project)
+            project["editorial"]["publication_blockers"] = []
+            project["editorial"]["publication_blocked"] = True
+            readiness = publication_readiness(project)
+            self.assertFalse(readiness["ready"])
+            self.assertTrue(any("publication_blocked" in item for item in readiness["blockers"]))
+
+    def test_renderer_keeps_draft_watermark_and_report_when_clips_are_missing(self):
+        project = convert_brief(brief())
+        self._approve_reviews(project)
+        project["editorial"]["publication_blockers"] = []
+        project["editorial"]["publication_blocked"] = False
+        original_build = build_frame
+        draft_values = []
+
+        def observed_build(*args, **kwargs):
+            draft_values.append(kwargs["draft"])
+            return original_build(*args, **kwargs)
+
+        def fake_run(command):
+            target = Path(command[-1])
+            if target.suffix.lower() in {".mp4", ".jpg"}:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b"render-fixture")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project_path = root / "project.json"
+            project_path.write_text(json.dumps(project), encoding="utf-8")
+            voice = root / "voice.wav"; voice.write_bytes(b"voice")
+            output = root / "draft.mp4"
+            with (mock.patch("studio.render.assert_tool"),
+                  mock.patch("studio.render.locate_voice", return_value=voice),
+                  mock.patch("studio.render.duration_seconds", return_value=3.0),
+                  mock.patch("studio.render.run", side_effect=fake_run),
+                  mock.patch("studio.render.probe_media", return_value=media_probe(20)),
+                  mock.patch("studio.render.build_frame", side_effect=observed_build)):
+                render(project, project_path, output=output)
+            report = json.loads((root / "pilot.quality.json").read_text(encoding="utf-8"))
+            self.assertTrue(all(draft_values))
+            self.assertEqual("draft", report["status"])
+            self.assertFalse(report["publication_ready"])
+            self.assertTrue(any("footage missing" in item.lower() for item in report["blockers"]))
 
     def test_focus_placeholder_is_visibly_distinct_from_real_footage_frame(self):
         scene = convert_brief(brief())["scenes"][0]
@@ -141,6 +236,17 @@ class ProductionBridgeTests(unittest.TestCase):
             with self.assertRaisesRegex(BridgeError, "remain inside"):
                 intake_recording(project_path, "shot-01", video, start=10, duration=5,
                                  asset_root=root / "imports", probe=lambda _path: media_probe(12))
+            for value in (float("nan"), float("inf"), float("-inf")):
+                with self.assertRaisesRegex(BridgeError, "finite"):
+                    intake_recording(project_path, "shot-01", video, start=value, duration=5,
+                                     asset_root=root / "imports", probe=lambda _path: media_probe(12))
+                with self.assertRaisesRegex(BridgeError, "finite"):
+                    intake_recording(project_path, "shot-01", video, start=0, duration=value,
+                                     asset_root=root / "imports", probe=lambda _path: media_probe(12))
+                with self.assertRaisesRegex(BridgeError, "finite"):
+                    intake_recording(project_path, "shot-01", video, start=0, duration=5,
+                                     asset_root=root / "imports",
+                                     probe=lambda _path, v=value: media_probe(v))
 
 
 if __name__ == "__main__":
