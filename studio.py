@@ -55,6 +55,7 @@ def main():
     d.add_argument("--ai", action="store_true", help="Analyze fetched article content with bounded Gemini JSON")
     d.add_argument("--model", default=None)
     d.add_argument("--output", required=True)
+    d.add_argument("--promote", action="store_true", help="Archive and replace the same-topic draft as a new unapproved revision")
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -131,7 +132,7 @@ def main():
                 analysis = gemini_analyze(candidate, article, model=args.model)
                 mode = "gemini"
             brief = build_production_brief(candidate, analysis, analysis_mode=mode)
-            output = save_brief(brief, Path(args.output).resolve())
+            output = save_brief(brief, Path(args.output).resolve(), promote=args.promote)
             print("Editorial brief:", output)
             print("Publication blocked:", brief["publication_blocked"])
             for blocker in brief["publication_blockers"]:

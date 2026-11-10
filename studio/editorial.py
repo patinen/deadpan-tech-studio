@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 
@@ -17,6 +18,7 @@ CLASSIFICATIONS = ACTIONABLE | {"ui feature", "security advisory", "product anno
 REQUIRED = {"classification", "accepted", "rejection_reason", "actual_feature", "viewer_problem",
             "realistic_benefit", "target_audience", "visual_demonstration", "opening_hook",
             "availability", "claims", "uncertainties", "sources", "script", "shot_plan"}
+HTTPS_UPGRADE_HOSTS = {"workspaceupdates.googleblog.com"}
 
 
 class EditorialError(RuntimeError):
@@ -46,12 +48,33 @@ class _ArticleParser(HTMLParser):
             self.parts.append(data.strip())
 
 
+def _verified_https_url(url: str) -> str:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "https":
+        return url
+    if parsed.scheme == "http" and host in HTTPS_UPGRADE_HOSTS:
+        return urlunparse(("https", parsed.netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+    raise EditorialError("Editorial article URLs must use HTTPS or a recognized HTTPS-upgrade source")
+
+
 def fetch_article(url: str, *, timeout: float = 20, session=requests) -> dict:
     """Fetch one public article as inert text; never follows discovered instructions."""
-    if urlparse(url).scheme != "https":
-        raise EditorialError("Editorial article URLs must use HTTPS")
-    response = session.get(url, timeout=timeout, headers={
-        "User-Agent": "DeadpanTechStudio/1.2 (human-approved editorial research)"})
+    requested = _verified_https_url(url)
+    headers = {"User-Agent": "DeadpanTechStudio/1.2 (human-approved editorial research)"}
+    for _ in range(4):
+        response = session.get(requested, timeout=timeout, headers=headers, allow_redirects=False)
+        if response.status_code not in {301, 302, 303, 307, 308}:
+            break
+        location = response.headers.get("Location")
+        if not location:
+            raise EditorialError("Article redirect omitted its destination")
+        destination = _verified_https_url(urljoin(requested, location))
+        if (urlparse(destination).hostname or "").lower() != (urlparse(requested).hostname or "").lower():
+            raise EditorialError("Article redirect crossed to an unverified host")
+        requested = destination
+    else:
+        raise EditorialError("Article exceeded the safe redirect limit")
     response.raise_for_status()
     content_type = response.headers.get("Content-Type", "")
     if "html" not in content_type.lower():
@@ -63,8 +86,12 @@ def fetch_article(url: str, *, timeout: float = 20, session=requests) -> dict:
     text = " ".join(" ".join(parser.parts).split())
     if len(text) < 200:
         raise EditorialError("Article did not contain enough readable text")
-    canonical = canonicalize_url(urljoin(url, parser.canonical)) if parser.canonical else canonicalize_url(url)
-    return {"url": canonical, "retrieved_from": canonicalize_url(url), "text": text[:40_000],
+    canonical_candidate = urljoin(requested, parser.canonical) if parser.canonical else requested
+    canonical_https = _verified_https_url(canonical_candidate)
+    if (urlparse(canonical_https).hostname or "").lower() != (urlparse(requested).hostname or "").lower():
+        raise EditorialError("Article canonical URL crossed to an unverified host")
+    canonical = canonicalize_url(canonical_https)
+    return {"url": canonical, "retrieved_from": canonicalize_url(requested), "text": text[:40_000],
             "truncated": len(text) > 40_000}
 
 
@@ -104,13 +131,19 @@ def gemini_analyze(candidate: dict, article: dict, *, model: str | None = None,
 
 
 def validate_analysis(value: dict, allowed_urls: list[str]) -> dict:
-    if not isinstance(value, dict) or not REQUIRED.issubset(value):
-        raise EditorialError(f"Editorial analysis is missing fields: {sorted(REQUIRED - set(value or {}))}")
-    if value["classification"] not in CLASSIFICATIONS or not isinstance(value["accepted"], bool):
+    if not isinstance(value, dict):
+        raise EditorialError("Editorial analysis root must be a JSON object")
+    if not REQUIRED.issubset(value):
+        raise EditorialError(f"Editorial analysis is missing fields: {sorted(REQUIRED - set(value))}")
+    if (not isinstance(value["classification"], str) or value["classification"] not in CLASSIFICATIONS
+            or not isinstance(value["accepted"], bool)):
         raise EditorialError("Editorial analysis has an invalid classification or accepted flag")
-    allowed = {canonicalize_url(url) for url in allowed_urls}
+    if not isinstance(allowed_urls, list) or not allowed_urls or any(not isinstance(url, str) for url in allowed_urls):
+        raise EditorialError("Allowed evidence URLs must be a non-empty string list")
+    allowed = {canonicalize_url(_verified_https_url(url)) for url in allowed_urls}
     sources = value.get("sources")
-    if not isinstance(sources, list) or not sources or any(canonicalize_url(url) not in allowed for url in sources):
+    if (not isinstance(sources, list) or not sources or any(not isinstance(url, str) for url in sources)
+            or any(canonicalize_url(_verified_https_url(url)) not in allowed for url in sources)):
         raise EditorialError("Editorial analysis cited a source that was not supplied")
     claims = value.get("claims")
     if not isinstance(claims, list):
@@ -118,25 +151,35 @@ def validate_analysis(value: dict, allowed_urls: list[str]) -> dict:
     for claim in claims:
         citations = claim.get("evidence_urls") if isinstance(claim, dict) else None
         if (not isinstance(claim, dict) or not isinstance(claim.get("text"), str)
-                or claim.get("confidence") not in {"high", "medium", "low"}
-                or not isinstance(citations, list) or not citations
-                or any(canonicalize_url(url) not in allowed for url in citations)):
+                or not isinstance(claim.get("confidence"), str)
+                or claim["confidence"] not in {"high", "medium", "low"}
+                or not isinstance(citations, list) or not citations or any(not isinstance(url, str) for url in citations)
+                or any(canonicalize_url(_verified_https_url(url)) not in allowed for url in citations)):
             raise EditorialError("Every factual claim requires confidence and supplied evidence URLs")
     availability = value.get("availability")
-    if not isinstance(availability, dict) or availability.get("status") not in {"available", "limited", "unavailable", "unknown"}:
+    if (not isinstance(availability, dict) or not isinstance(availability.get("status"), str)
+            or availability["status"] not in {"available", "limited", "unavailable", "unknown"}):
         raise EditorialError("Editorial availability must be available, limited, unavailable, or unknown")
+    for field in ("platforms", "accounts_or_plans", "restrictions"):
+        if not isinstance(availability.get(field), list) or any(not isinstance(item, str) for item in availability[field]):
+            raise EditorialError(f"Editorial availability {field} must be a string list")
+    if not isinstance(availability.get("rollout"), str):
+        raise EditorialError("Editorial availability rollout must be a string")
     if availability["status"] in {"unavailable", "unknown"} and value["accepted"]:
         raise EditorialError("Unavailable or unknown features cannot be accepted for production")
     if value["classification"] not in ACTIONABLE | {"ui feature"} and value["accepted"]:
         raise EditorialError("News, opinion, advisories, roundups, and unsupported items must be rejected")
-    if not value["accepted"] and not value.get("rejection_reason"):
+    if not isinstance(value.get("rejection_reason"), str):
+        raise EditorialError("Editorial rejection_reason must be a string")
+    if not value["accepted"] and not value["rejection_reason"].strip():
         raise EditorialError("Rejected editorial analysis requires a reason")
     for field in ("actual_feature", "viewer_problem", "realistic_benefit", "target_audience",
                   "visual_demonstration", "opening_hook"):
         if not isinstance(value.get(field), str) or len(value[field].strip()) < 8:
             raise EditorialError(f"Editorial field {field} is too vague")
-    if not isinstance(value.get("uncertainties"), list):
-        raise EditorialError("Editorial uncertainties must be a list")
+    if (not isinstance(value.get("uncertainties"), list)
+            or any(not isinstance(item, str) for item in value["uncertainties"])):
+        raise EditorialError("Editorial uncertainties must be a string list")
     script, shots = value.get("script"), value.get("shot_plan")
     if (not isinstance(script, list) or not 3 <= len(script) <= 6
             or any(not isinstance(line, str) or not line.strip() for line in script)):
@@ -145,13 +188,15 @@ def validate_analysis(value: dict, allowed_urls: list[str]) -> dict:
     if not 45 <= word_count <= 85:
         raise EditorialError("Editorial script must be 45–85 words for a 20–30 second target")
     if (not isinstance(shots, list) or len(shots) != len(script)
-            or any(not isinstance(shot, dict) or not isinstance(shot.get("seconds"), (int, float))
-                   or not isinstance(shot.get("shot"), str) for shot in shots)):
+            or any(not isinstance(shot, dict) or isinstance(shot.get("seconds"), bool)
+                   or not isinstance(shot.get("seconds"), (int, float))
+                   or not math.isfinite(shot["seconds"]) or shot["seconds"] <= 0
+                   or not isinstance(shot.get("shot"), str) or not shot["shot"].strip() for shot in shots)):
         raise EditorialError("Shot plan must match the script and include seconds plus a visual instruction")
     duration = sum(shot["seconds"] for shot in shots)
     if not 20 <= duration <= 30:
         raise EditorialError("Shot plan duration must be 20–30 seconds")
-    value["sources"] = [canonicalize_url(url) for url in sources]
+    value["sources"] = [canonicalize_url(_verified_https_url(url)) for url in sources]
     return value
 
 
@@ -195,8 +240,21 @@ def build_production_brief(candidate: dict, analysis: dict, *, analysis_mode: st
             "publication_blockers": blockers}
 
 
-def save_brief(brief: dict, output: Path, *, existing_dir: Path | None = None) -> Path:
+def save_brief(brief: dict, output: Path, *, existing_dir: Path | None = None,
+               promote: bool = False) -> Path:
     existing_dir = existing_dir or output.parent
+    current = None
+    if output.exists():
+        try:
+            current = json.loads(output.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise EditorialError(f"Existing brief is malformed and cannot be promoted: {output}") from exc
+        if not promote:
+            raise EditorialError(f"Refusing to overwrite editorial brief: {output}")
+        if set(current.get("sources", [])) != set(brief.get("sources", [])):
+            raise EditorialError("Promotion source mismatch; refusing to replace an unrelated topic")
+        if brief.get("analysis_mode") == "offline-fixture":
+            raise EditorialError("Promotion requires a non-fixture reviewed draft")
     for path in existing_dir.glob("*.json"):
         try:
             previous = json.loads(path.read_text(encoding="utf-8"))
@@ -204,9 +262,27 @@ def save_brief(brief: dict, output: Path, *, existing_dir: Path | None = None) -
                 raise EditorialError(f"Duplicate editorial topic already exists: {path}")
         except json.JSONDecodeError:
             continue
-    if output.exists():
-        raise EditorialError(f"Refusing to overwrite editorial brief: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
+    if current is not None:
+        history = output.parent / "history"
+        history.mkdir(parents=True, exist_ok=True)
+        revision = int(current.get("revision", current.get("version", 1)))
+        archive = history / f"{output.stem}.v{revision}{output.suffix}"
+        if archive.exists():
+            raise EditorialError(f"Promotion archive already exists: {archive}")
+        brief = dict(brief)
+        brief["revision"] = revision + 1
+        brief["promotion"] = {"previous_revision": revision,
+                              "archived_at": str(archive.relative_to(output.parent)),
+                              "previous_analysis_mode": current.get("analysis_mode"),
+                              "previous_review": current.get("review", {})}
+        brief["review"] = {key: False for key in brief.get("review", current.get("review", {}))}
+        brief["publication_blocked"] = True
+        blockers = list(brief.get("publication_blockers", []))
+        if "Promoted revision requires fresh human review." not in blockers:
+            blockers.append("Promoted revision requires fresh human review.")
+        brief["publication_blockers"] = blockers
+        archive.write_text(json.dumps(current, indent=2, ensure_ascii=False), encoding="utf-8")
     output.write_text(json.dumps(brief, indent=2, ensure_ascii=False), encoding="utf-8")
     return output
 

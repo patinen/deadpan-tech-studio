@@ -21,6 +21,12 @@ One command analyzes one candidate, the request has a 4,096-token output cap, an
 temperature is fixed at 0.2. Provider errors and malformed responses stop the run.
 No key is logged or written. There is no batch mode or uncapped analysis loop.
 
+Legacy Scout archives may contain `http://workspaceupdates.googleblog.com`
+article links. That recognized host is upgraded before the request, and the HTTPS
+response itself must succeed. The fetcher never downgrades HTTPS, rejects other
+HTTP hosts, disables automatic redirects, and only follows a bounded same-host
+HTTPS redirect chain.
+
 The model receives the selected Scout candidate, the fetched article text, and an
 explicit allow-list containing that article URL. Validation rejects invented
 citations, unsupported claims without evidence, unknown/unavailable features
@@ -40,6 +46,16 @@ used. Its output remains publication-blocked until a human captures and verifies
 the real interaction, reviews every factual claim, confirms asset rights, and
 approves the script and final video. Re-running refuses to overwrite a brief or
 create another brief using the same source.
+
+## Promote or revise a brief
+
+Use `--promote` only when replacing the same output path and canonical source with
+a non-fixture reviewed analysis. The previous file is archived as
+`editorial/history/<name>.vN.json`; its human review state is copied into the new
+revision's promotion metadata for traceability. All current approval flags are
+reset to false, a fresh-review blocker is added, and publication remains blocked.
+Source mismatches, unrelated duplicates, fixture-to-fixture replacement, existing
+archive collisions, and implicit overwrites fail without changing the brief.
 
 ## Pilot limitation
 
