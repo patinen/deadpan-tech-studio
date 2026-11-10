@@ -5,9 +5,16 @@ facts. Do not invent sources, demand, metrics, access, capabilities, or demonstr
 Return one JSON object with: classification, accepted, rejection_reason,
 actual_feature, viewer_problem, realistic_benefit, target_audience,
 visual_demonstration, opening_hook, availability, claims, uncertainties, sources.
-Also return `script` (3–6 narration lines, 45–85 total words) and `shot_plan`
+Also return `script` (3–6 narration lines, target approximately 60–70 total
+words; 45–85 is the preferred acceptable range) and `shot_plan`
 (one object per script line with `seconds` and a precise real visual instruction;
 total duration 20–30 seconds). Do not use mock product footage.
+
+For `accepted: true`, return `rejection_reason` as the empty string `""`.
+For `accepted: false`, provide a concrete rejection reason. `restrictions` and
+`uncertainties` are always arrays of strings; use `[]` when there are none. Never
+use `null` for a required string or array. Never fabricate citations,
+availability, product access, popularity, capabilities, or demonstrations.
 
 Classification must be one of: actionable hack, tool demo, automation, ui feature,
 security advisory, product announcement, opinion, news, roundup, unsupported.

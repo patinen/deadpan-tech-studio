@@ -1,0 +1,42 @@
+{
+  "classification": "ui feature",
+  "accepted": true,
+  "rejection_reason": "",
+  "actual_feature": "Create, preview, and edit files directly in the Gemini app",
+  "viewer_problem": "Switching away from chat interfaces to create, preview, and edit files causes friction during generation tasks.",
+  "realistic_benefit": "Generate, preview, and edit files and code directly inside your Gemini app chat without switching apps.",
+  "target_audience": "Google Workspace users and Gemini app users",
+  "visual_demonstration": "Prompt Gemini to generate a slide deck or sheet, preview it inside the chat interface, and expand to edit text directly.",
+  "opening_hook": "See how to create, preview, and edit files directly inside the Gemini app chat.",
+  "availability": {
+    "status": "available",
+    "platforms": ["web", "mobile"],
+    "accounts_or_plans": ["Google Workspace customers", "Workspace Individual subscribers", "personal Google accounts"],
+    "rollout": "Rapid Release and Scheduled Release domains: Available now",
+    "restrictions": ["PDF preview and editing supported on web and mobile", "all other formats supported on web only"]
+  },
+  "claims": [
+    {
+      "text": "You can now generate, preview, and edit files right within your Gemini app chat—expand to full screen to type edits directly, highlight text to ask questions, or have Gemini refine them.",
+      "evidence_urls": ["https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"],
+      "confidence": "high"
+    },
+    {
+      "text": "PDF preview and editing is supported on both the web and mobile, while all other formats are supported on the web only.",
+      "evidence_urls": ["https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"],
+      "confidence": "high"
+    }
+  ],
+  "uncertainties": [],
+  "sources": ["https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"],
+  "script": [
+    "Generate files directly inside the Gemini app chat instead of switching windows.",
+    "Preview your generated slides, sheets, or documents right within the conversation interface.",
+    "Expand to full screen to edit text directly or ask Gemini to refine your work."
+  ],
+  "shot_plan": [
+    {"seconds": 8, "shot": "Screen recording showing a user typing a prompt to generate a document inside the Gemini app chat."},
+    {"seconds": 10, "shot": "Close-up of the inline preview pane displaying the generated file layout within the chat."},
+    {"seconds": 7, "shot": "Expanding the view to full screen and editing text directly inside the interface."}
+  ]
+}

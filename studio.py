@@ -18,7 +18,8 @@ from studio.visual_qa import generate_contact_sheet
 from studio.recipe_capture import capture_recipe
 from studio.scout import run_scout
 from studio.editorial import (build_production_brief, fetch_article, gemini_analyze,
-                              load_fixture, save_brief, select_candidate)
+                              load_fixture, replay_model_response, save_brief,
+                              select_candidate)
 
 
 def load_env():
@@ -52,10 +53,15 @@ def main():
     d.add_argument("--report", help="Scout JSON report containing the selected candidate")
     d.add_argument("--candidate", help="Candidate id, exact title, or canonical URL")
     d.add_argument("--fixture", help="Offline article + validated analysis fixture")
+    d.add_argument("--diagnostic", help="Saved diagnostic or manually revised analysis JSON; no API call")
+    d.add_argument("--source", action="append", help="Allowed evidence URL for diagnostic replay (repeatable)")
     d.add_argument("--ai", action="store_true", help="Analyze fetched article content with bounded Gemini JSON")
     d.add_argument("--model", default=None)
     d.add_argument("--output", required=True)
     d.add_argument("--promote", action="store_true", help="Archive and replace the same-topic draft as a new unapproved revision")
+    replay = sub.add_parser("replay-editorial", help="Revalidate saved Gemini editorial JSON without an API call")
+    replay.add_argument("response")
+    replay.add_argument("--source", action="append", required=True, help="Allowed evidence URL (repeatable)")
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -117,9 +123,26 @@ def main():
             print("No demos executed. Select and verify a proposal manually before scripting.")
             return 0
         if args.cmd == "develop":
+            if args.fixture and args.diagnostic:
+                raise ValueError("develop accepts either --fixture or --diagnostic, not both")
             if args.fixture:
                 candidate, article, analysis = load_fixture(Path(args.fixture).resolve())
                 mode = "offline-fixture"
+            elif args.diagnostic:
+                candidate = None
+                sources = args.source or []
+                if args.report or args.candidate:
+                    if not args.report or not args.candidate:
+                        raise ValueError("diagnostic development requires both --report and --candidate when either is supplied")
+                    report = json.loads(Path(args.report).resolve().read_text(encoding="utf-8"))
+                    candidate = select_candidate(report, args.candidate)
+                    sources = [evidence["url"] for evidence in candidate.get("evidence", [])]
+                if not sources:
+                    raise ValueError("diagnostic development requires --source or a selected Scout candidate")
+                analysis = replay_model_response(Path(args.diagnostic).resolve(), sources)
+                candidate = candidate or {"id": slugify(analysis["actual_feature"]),
+                                          "working_title": analysis["actual_feature"]}
+                mode = "offline-replay"
             else:
                 if not args.report or not args.candidate:
                     raise ValueError("develop requires --report and --candidate, or --fixture")
@@ -137,6 +160,10 @@ def main():
             print("Publication blocked:", brief["publication_blocked"])
             for blocker in brief["publication_blockers"]:
                 print("BLOCKER:", blocker)
+            return 0
+        if args.cmd == "replay-editorial":
+            replay_model_response(Path(args.response).resolve(), args.source)
+            print("Editorial response is valid for the supplied evidence URLs.")
             return 0
         path = Path(args.project).resolve()
         project = load_project(path)

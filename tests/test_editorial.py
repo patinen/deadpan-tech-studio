@@ -4,9 +4,11 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
+import requests
+
 from studio.editorial import (EditorialError, build_production_brief, fetch_article,
-                              gemini_analyze, load_fixture, save_brief, select_candidate,
-                              validate_analysis)
+                              gemini_analyze, load_fixture, replay_model_response,
+                              save_brief, select_candidate, validate_analysis)
 from studio.utils import ROOT
 
 
@@ -117,6 +119,61 @@ class EditorialTests(unittest.TestCase):
         with self.assertRaisesRegex(EditorialError, "missing fields"):
             validate_analysis({"classification": "tool demo"}, [SOURCE])
 
+    def test_trivial_null_representations_are_safely_normalized(self):
+        value = analysis(rejection_reason=None)
+        value["availability"]["restrictions"] = None
+        checked = validate_analysis(value, [SOURCE])
+        self.assertEqual("", checked["rejection_reason"])
+        self.assertEqual([], checked["availability"]["restrictions"])
+
+    def test_real_observed_39_word_response_is_warning_not_failure(self):
+        path = ROOT / "fixtures" / "editorial" / "gemini-39-word-response.json"
+        checked = replay_model_response(path, [
+            "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"])
+        self.assertEqual(39, sum(len(line.split()) for line in checked["script"]))
+        self.assertEqual(1, len(checked["editorial_warnings"]))
+        self.assertIn("preferred editorial target", checked["editorial_warnings"][0])
+        brief = build_production_brief({"id": "gemini-files", "working_title": "Gemini files"},
+                                       checked, analysis_mode="offline-replay")
+        self.assertTrue(brief["publication_blocked"])
+        self.assertTrue(any("Editorial warning" in blocker for blocker in brief["publication_blockers"]))
+
+    def test_clearly_unusable_script_still_fails(self):
+        too_short = analysis(
+            script=["Only a few words.", "Still far too short.", "No useful ending here."],
+            shot_plan=[{"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 6, "shot": "Real footage."}])
+        with self.assertRaisesRegex(EditorialError, "script is unusable"):
+            validate_analysis(too_short, [SOURCE])
+        too_fast = analysis(
+            script=["word " * 33, "word " * 33, "word " * 33],
+            shot_plan=[{"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 7, "shot": "Real footage."},
+                       {"seconds": 6, "shot": "Real footage."}])
+        with self.assertRaisesRegex(EditorialError, "script is unusable"):
+            validate_analysis(too_fast, [SOURCE])
+
+    def test_manual_script_revision_revalidates_without_mutating_file(self):
+        revised = analysis()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manual-revision.json"
+            path.write_text(json.dumps(revised, indent=2), encoding="utf-8")
+            before = path.read_text(encoding="utf-8")
+            checked = replay_model_response(path, [SOURCE])
+            self.assertEqual([], checked["editorial_warnings"])
+            self.assertEqual(before, path.read_text(encoding="utf-8"))
+
+    def test_missing_or_object_restrictions_remain_invalid(self):
+        missing = analysis()
+        del missing["availability"]["restrictions"]
+        with self.assertRaisesRegex(EditorialError, "restrictions must be a string list"):
+            validate_analysis(missing, [SOURCE])
+        object_value = analysis()
+        object_value["availability"]["restrictions"] = {"platform": "web"}
+        with self.assertRaisesRegex(EditorialError, "restrictions must be a string list"):
+            validate_analysis(object_value, [SOURCE])
+
     def test_non_object_and_malformed_nested_model_values_are_controlled(self):
         for root in (None, [], "json", 7):
             with self.subTest(root=root), self.assertRaisesRegex(EditorialError, "root must be"):
@@ -159,6 +216,76 @@ class EditorialTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"GEMINI_API_KEY": ""}):
             with self.assertRaisesRegex(EditorialError, "GEMINI_API_KEY"):
                 gemini_analyze(candidate, article)
+
+    def test_valid_structured_response_uses_complete_schema(self):
+        captured = {}
+        class Response:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self):
+                return {"candidates": [{"content": {"parts": [{"text": json.dumps(analysis())}]}}]}
+        def requester(_url, **kwargs):
+            captured.update(kwargs)
+            return Response()
+        with mock.patch.dict("os.environ", {"GEMINI_API_KEY": "secret-key"}):
+            checked = gemini_analyze({"id": "x"}, {"url": SOURCE, "text": "article"}, requester=requester)
+        schema = captured["json"]["generationConfig"]["responseJsonSchema"]
+        self.assertEqual("object", schema["type"])
+        self.assertEqual("array", schema["properties"]["availability"]["properties"]["restrictions"]["type"])
+        self.assertEqual("number", schema["properties"]["shot_plan"]["items"]["properties"]["seconds"]["type"])
+        self.assertEqual("ui feature", checked["classification"])
+
+    def test_invalid_model_output_writes_redacted_diagnostic_and_replays_offline(self):
+        class Response:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self): return {"candidates": [{"content": {"parts": [{"text": "{bad json"}]}}]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.dict("os.environ", {"GEMINI_API_KEY": "secret-key"}):
+                with self.assertRaisesRegex(EditorialError, "saved diagnostic"):
+                    gemini_analyze({"id": "x"}, {"url": SOURCE, "text": "article"},
+                                   requester=lambda *_args, **_kwargs: Response(), diagnostic_dir=root)
+            diagnostic = next(root.glob("*.json"))
+            self.assertNotIn("secret-key", diagnostic.read_text(encoding="utf-8"))
+            with self.assertRaisesRegex(EditorialError, "malformed JSON"):
+                replay_model_response(diagnostic, [SOURCE])
+
+            valid_path = root / "valid.json"
+            valid_path.write_text(json.dumps({"raw_model_output": json.dumps(analysis())}), encoding="utf-8")
+            self.assertEqual("ui feature", replay_model_response(valid_path, [SOURCE])["classification"])
+
+    def test_transient_errors_retry_with_bounded_backoff(self):
+        calls, sleeps = [], []
+        class Response:
+            def __init__(self, status): self.status_code = status
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    response = requests.Response()
+                    response.status_code = self.status_code
+                    raise requests.HTTPError(f"HTTP {self.status_code}", response=response)
+            def json(self): return {"candidates": [{"content": {"parts": [{"text": json.dumps(analysis())}]}}]}
+        statuses = iter([429, 503, 200])
+        def requester(*_args, **_kwargs):
+            status = next(statuses); calls.append(status); return Response(status)
+        with mock.patch.dict("os.environ", {"GEMINI_API_KEY": "secret-key"}):
+            gemini_analyze({"id": "x"}, {"url": SOURCE, "text": "article"}, requester=requester,
+                           sleep_fn=sleeps.append)
+        self.assertEqual([429, 503, 200], calls)
+        self.assertEqual([1, 2], sleeps)
+
+    def test_schema_failure_is_not_retried(self):
+        calls = []
+        class Response:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self): return {"candidates": [{"content": {"parts": [{"text": json.dumps({"accepted": True})}]}}]}
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict("os.environ", {"GEMINI_API_KEY": "secret-key"}):
+            with self.assertRaisesRegex(EditorialError, "schema error"):
+                gemini_analyze({"id": "x"}, {"url": SOURCE, "text": "article"},
+                               requester=lambda *_args, **_kwargs: calls.append(1) or Response(),
+                               diagnostic_dir=Path(directory), sleep_fn=lambda _seconds: None)
+        self.assertEqual([1], calls)
 
     def test_editorial_rejection_is_explicit(self):
         value = analysis(classification="security advisory", accepted=False,
@@ -211,6 +338,21 @@ class EditorialTests(unittest.TestCase):
                 save_brief(unrelated, output, promote=True)
             with self.assertRaisesRegex(EditorialError, "non-fixture"):
                 save_brief(current, output, promote=True)
+
+    def test_promotion_happens_only_after_successful_validation(self):
+        checked = validate_analysis(analysis(), [SOURCE])
+        current = build_production_brief({"id": "one", "working_title": "One"}, checked,
+                                         analysis_mode="offline-fixture")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "one.json"
+            save_brief(current, output)
+            before = output.read_text(encoding="utf-8")
+            invalid = analysis()
+            invalid["availability"]["restrictions"] = {"bad": "shape"}
+            with self.assertRaises(EditorialError):
+                validate_analysis(invalid, [SOURCE])
+            self.assertEqual(before, output.read_text(encoding="utf-8"))
+            self.assertFalse((Path(directory) / "history").exists())
 
     def test_pilot_fixture_is_valid_and_blocked_without_real_demo(self):
         fixture = ROOT / "fixtures" / "editorial" / "gemini-file-editing.json"
