@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from studio.scout import (DEFAULT_WEIGHTS, ScoutError, SourceSpec, build_candidate,
-                          parse_feed, run_scout, score_candidate, url_key)
+                          canonicalize_url, classify_item, load_analysis, parse_feed,
+                          run_scout, score_candidate, url_key)
 
 
 def item(title="Useful browser shortcut", url="https://example.test/item"):
@@ -26,6 +27,18 @@ class ScoutTests(unittest.TestCase):
         self.assertTrue(parsed[0]["published_at"].startswith("2026-11-01"))
         with self.assertRaisesRegex(ScoutError, "Malformed feed"):
             parse_feed(b"<rss><broken>", source)
+
+    def test_atom_prefers_canonical_html_over_comment_self_and_feed_links(self):
+        source = SourceSpec("Observed feed", "https://vendor.test/atom.xml")
+        payload = b'''<feed xmlns="http://www.w3.org/2005/Atom"><entry>
+          <title>Create a useful result</title><summary>Click Create to turn a document into a useful result for review.</summary>
+          <link rel="replies" type="application/atom+xml" href="https://vendor.test/post/comments/default" />
+          <link rel="self" type="application/atom+xml" href="https://vendor.test/post/feed" />
+          <link rel="alternate" type="text/html" href="https://www.vendor.test/post/?utm_source=feed#comments" />
+          <updated>2026-11-09T10:00:00Z</updated></entry></feed>'''
+        parsed = parse_feed(payload, source)
+        self.assertEqual("https://vendor.test/post", parsed[0]["url"])
+        self.assertEqual(source.url, parsed[0]["feed_url"])
 
     def test_scoring_is_deterministic_and_penalizes_effort_and_risk(self):
         strong = {key: 5 for key in DEFAULT_WEIGHTS}
@@ -55,6 +68,21 @@ class ScoutTests(unittest.TestCase):
         self.assertTrue(proposal["uncertain_claims"])
         self.assertEqual(proposal["restrictions"]["licensing"], "unknown")
         self.assertEqual(proposal["evidence"][0]["url"], "https://example.test/item")
+        self.assertEqual("unknown", proposal["demand_confidence"])
+        self.assertNotEqual(proposal["working_title"], proposal["hook_suggestion"])
+
+    def test_editorial_classification_separates_action_from_news_and_maintenance(self):
+        self.assertEqual("actionable hack", classify_item(item())[0])
+        maintenance = item("Stable Channel Update") | {"summary": "This stable release contains security and maintenance fixes for desktop users."}
+        opinion = item("Why regulators got browser choice wrong") | {"summary": "Our opinion about policy and regulator choices in browser markets."}
+        self.assertEqual("maintenance release", classify_item(maintenance)[0])
+        self.assertEqual("opinion", classify_item(opinion)[0])
+        security_news = item("Hackers exploited iOS flaws to infect phones") | {"summary": "A report describes malware and a recently fixed vulnerability."}
+        ga_news = item("Tool in Slack is generally available") | {"summary": "The vendor announced general availability for customer accounts."}
+        self.assertEqual("product news", classify_item(security_news)[0])
+        self.assertEqual("product news", classify_item(ga_news)[0])
+        version_news = item("Gemini Omni 1.2 now in Vids with improved quality") | {"summary": "The vendor announced a new model version with longer generations."}
+        self.assertEqual("product news", classify_item(version_news)[0])
 
     def test_fixture_run_deduplicates_and_never_overwrites(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -129,7 +157,7 @@ class ScoutTests(unittest.TestCase):
                 weights_path=None, output_dir=root / "out", include_known=True,
                 now=datetime(2026, 11, 9, tzinfo=timezone.utc))
             self.assertEqual([], report["proposals"])
-            self.assertIn("unsupported URL scheme", report["source_failures"][0])
+            self.assertIn("Rejected non-article URL", report["source_failures"][0])
 
     def test_same_topic_title_from_repeated_releases_appears_once(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -143,7 +171,27 @@ class ScoutTests(unittest.TestCase):
                 limit=10, fixture_path=fixture, sources_path=root / "unused",
                 weights_path=None, output_dir=root / "out", include_known=True,
                 now=datetime(2026, 11, 9, tzinfo=timezone.utc))
-            self.assertEqual(1, len(report["proposals"]))
+            self.assertEqual(0, len(report["proposals"]))
+            self.assertEqual(1, len(report["research_material"]))
+            self.assertEqual(1, report["counts"]["filtered"])
+
+    def test_optional_analysis_is_bounded_and_schema_validated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "analysis.json"
+            path.write_text(json.dumps({"analyses": [{"url": "https://example.test/item",
+                "editorial_category": "tool demo", "brief": {"hook": "Show the measured output first."},
+                "demand_evidence": []}]}), encoding="utf-8")
+            self.assertIn(url_key("https://example.test/item"), load_analysis(path, 1))
+            with self.assertRaisesRegex(ScoutError, "analysis-limit"):
+                load_analysis(path, 0)
+            path.write_text(json.dumps({"analyses": [{"url": "https://example.test/item",
+                "editorial_category": "tool demo", "demand_evidence": ["popular"]}]}), encoding="utf-8")
+            with self.assertRaisesRegex(ScoutError, "cited demand_evidence"):
+                load_analysis(path, 1)
+
+    def test_canonical_url_dedup_removes_tracking_and_fragments(self):
+        self.assertEqual("https://example.test/post?a=1",
+                         canonicalize_url("HTTPS://WWW.EXAMPLE.TEST/post/?utm_source=rss&a=1#comments"))
 
 
 if __name__ == "__main__":

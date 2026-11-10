@@ -44,6 +44,8 @@ def main():
     s.add_argument("--weights", default=str(ROOT / "scout" / "weights.json"))
     s.add_argument("--output-dir", default=str(ROOT / "research"))
     s.add_argument("--include-known", action="store_true", help="Do not filter prior research/content")
+    s.add_argument("--analysis-file", default=None, help="Optional validated provider-neutral analysis JSON")
+    s.add_argument("--analysis-limit", type=int, default=10, help="Maximum assisted-analysis rows")
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -92,8 +94,11 @@ def main():
             json_path, markdown_path, report = run_scout(
                 limit=args.limit, fixture_path=fixture, sources_path=Path(args.sources).resolve(),
                 weights_path=Path(args.weights).resolve(), output_dir=Path(args.output_dir).resolve(),
-                include_known=args.include_known)
-            print(f"Research status: {report['status']} ({len(report['proposals'])} proposals)")
+                include_known=args.include_known,
+                analysis_path=Path(args.analysis_file).resolve() if args.analysis_file else None,
+                analysis_limit=args.analysis_limit)
+            print(f"Research status: {report['status']} ({len(report['proposals'])} shortlisted opportunities)")
+            print("Counts:", ", ".join(f"{key}={value}" for key, value in report["counts"].items()))
             print("JSON report:", json_path)
             print("Markdown report:", markdown_path)
             if report["source_failures"]:

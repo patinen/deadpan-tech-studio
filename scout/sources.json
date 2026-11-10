@@ -3,6 +3,7 @@
     {"name":"Google Workspace Updates","url":"https://workspaceupdates.googleblog.com/feeds/posts/default","kind":"official release notes","category":"Useful software features","confidence":5},
     {"name":"Google Chrome Blog","url":"https://blog.google/products-and-platforms/products/chrome/rss/","kind":"official product publication","category":"Browser and productivity hacks","confidence":5},
     {"name":"GitHub Changelog","url":"https://github.blog/changelog/feed/","kind":"official changelog","category":"Useful software features","confidence":5},
-    {"name":"Mozilla Blog","url":"https://blog.mozilla.org/en/feed/","kind":"official product publication","category":"Browser and productivity hacks","confidence":5}
+    {"name":"Mozilla Blog","url":"https://blog.mozilla.org/en/feed/","kind":"official product publication","category":"Browser and productivity hacks","confidence":5},
+    {"name":"Ars Technica Technology Lab","url":"https://feeds.arstechnica.com/arstechnica/technology-lab","kind":"reputable technology publication","category":"Useful software features","confidence":4,"role":"independent discovery"}
   ]
 }

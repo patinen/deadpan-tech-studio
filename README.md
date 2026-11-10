@@ -198,10 +198,12 @@ Discover and rank evidence-linked candidates from the configured public feeds:
 python studio.py scout --limit 15
 ```
 
-The command writes a new timestamped JSON report and readable Markdown report to
-`research/`. It does not execute demonstrations, invent popularity signals, create
-projects, or change review flags. Unavailable sources are reported and partial
-research is labelled `incomplete`.
+The command writes a new timestamped JSON archive and readable Markdown report to
+`research/`. It separates a maximum-ten actionable shortlist from product news,
+opinion, roundups, maintenance releases and unsupported research material.
+Canonical article URLs and feed URLs are stored separately; source confidence,
+demand confidence and production readiness are not conflated. It does not execute
+demonstrations, invent popularity signals, create projects, or change review flags.
 
 For a deterministic offline workflow test, use clearly labelled sample data:
 
