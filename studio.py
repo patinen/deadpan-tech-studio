@@ -17,6 +17,8 @@ from studio.capture import capture_http_server_demo
 from studio.visual_qa import generate_contact_sheet
 from studio.recipe_capture import capture_recipe
 from studio.scout import run_scout
+from studio.editorial import (build_production_brief, fetch_article, gemini_analyze,
+                              load_fixture, save_brief, select_candidate)
 
 
 def load_env():
@@ -46,6 +48,14 @@ def main():
     s.add_argument("--include-known", action="store_true", help="Do not filter prior research/content")
     s.add_argument("--analysis-file", default=None, help="Optional validated provider-neutral analysis JSON")
     s.add_argument("--analysis-limit", type=int, default=10, help="Maximum assisted-analysis rows")
+    d = sub.add_parser("develop", help="Turn one Scout candidate into a blocked editorial production brief")
+    d.add_argument("--report", help="Scout JSON report containing the selected candidate")
+    d.add_argument("--candidate", help="Candidate id, exact title, or canonical URL")
+    d.add_argument("--fixture", help="Offline article + validated analysis fixture")
+    d.add_argument("--ai", action="store_true", help="Analyze fetched article content with bounded Gemini JSON")
+    d.add_argument("--model", default=None)
+    d.add_argument("--output", required=True)
+    d.add_argument("--promote", action="store_true", help="Archive and replace the same-topic draft as a new unapproved revision")
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -105,6 +115,28 @@ def main():
                 for failure in report["source_failures"]:
                     print("WARNING:", failure)
             print("No demos executed. Select and verify a proposal manually before scripting.")
+            return 0
+        if args.cmd == "develop":
+            if args.fixture:
+                candidate, article, analysis = load_fixture(Path(args.fixture).resolve())
+                mode = "offline-fixture"
+            else:
+                if not args.report or not args.candidate:
+                    raise ValueError("develop requires --report and --candidate, or --fixture")
+                report = json.loads(Path(args.report).resolve().read_text(encoding="utf-8"))
+                candidate = select_candidate(report, args.candidate)
+                source = candidate["evidence"][0]["url"]
+                article = fetch_article(source)
+                if not args.ai:
+                    raise ValueError("Live article development requires --ai; use --fixture for offline validation")
+                analysis = gemini_analyze(candidate, article, model=args.model)
+                mode = "gemini"
+            brief = build_production_brief(candidate, analysis, analysis_mode=mode)
+            output = save_brief(brief, Path(args.output).resolve(), promote=args.promote)
+            print("Editorial brief:", output)
+            print("Publication blocked:", brief["publication_blocked"])
+            for blocker in brief["publication_blockers"]:
+                print("BLOCKER:", blocker)
             return 0
         path = Path(args.project).resolve()
         project = load_project(path)

@@ -215,6 +215,35 @@ Configure allowed feeds in `scout/sources.json` and ranking weights in
 `scout/weights.json`. See [docs/SCOUTING.md](docs/SCOUTING.md) for source behavior,
 scoring, costs, limitations, deduplication, and the manual verification workflow.
 
+Turn one selected candidate into a human-reviewed production brief with the
+optional bounded Gemini editorial analyzer:
+
+```powershell
+python studio.py develop --report research/scout-latest.json `
+  --candidate candidate-id --ai --output editorial/candidate-id.json
+```
+
+The analyzer reads the actual canonical article, requires evidence URLs for every
+claim, rejects unsuitable topics, and validates a 20–30 second script and shot
+plan. It never verifies a product demonstration merely by reading an article.
+Known legacy Google Workspace `http://` article URLs are upgraded to HTTPS and
+must return valid HTML; other HTTP sources and cross-host redirects are rejected.
+
+To promote an existing fixture draft after a real AI-reviewed run, target the same
+file and opt in explicitly:
+
+```powershell
+python studio.py develop --report research/scout-latest.json `
+  --candidate candidate-id --ai --output editorial/candidate-id.json --promote
+```
+
+Promotion only accepts the same canonical source. It archives the previous
+revision under `editorial/history/`, records its review state, resets every
+approval on the new revision, and keeps publication blocked. Unrelated duplicate
+topics remain errors.
+See [docs/EDITORIAL_RESEARCH.md](docs/EDITORIAL_RESEARCH.md) for offline fixtures,
+cost controls, validation rules, and publication blockers.
+
 ## Generate new video scripts using Gemini (optional)
 
 Copy `.env.example` to `.env`, add your API key, then run:
