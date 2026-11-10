@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "id": "006-gemini-file-editing",
+  "title": "Create, preview, and edit files directly in the Gemini app",
+  "status": "editorial-draft",
+  "analysis_mode": "offline-fixture",
+  "sources": [
+    "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+  ],
+  "verified_topic": "On the Gemini web app, a user can generate a TXT or Markdown file, preview it, edit text directly, and ask Gemini to refine selected content without moving the draft to another editor.",
+  "target_viewer": "People who use Gemini for practical documents and want a faster path from rough notes to an editable file.",
+  "viewer_pain_point": "Drafting useful output in a chatbot often ends with copying it into another app before it can be corrected or formatted.",
+  "proposed_benefit": "For supported file types on the web, the first editing pass can remain inside the Gemini conversation, reducing copy-and-paste between tabs.",
+  "script_target_seconds": 25.0,
+  "script": [
+    "Turn messy meeting notes into an editable action plan without leaving Gemini.",
+    "Upload harmless notes, ask for a Markdown action plan, then open the generated preview and correct the due date directly.",
+    "Highlight one paragraph and ask Gemini to make it shorter. The edited file stays visible, so the result can be checked rather than politely imagined.",
+    "TXT and Markdown editing are web-only. Still, one fewer copy-paste ritual. We remain cautiously impressed."
+  ],
+  "shots": [
+    {
+      "seconds": 4.0,
+      "narration": "Turn messy meeting notes into an editable action plan without leaving Gemini.",
+      "shot": "Open on the completed real action plan inside an authenticated Gemini web session; no mock UI."
+    },
+    {
+      "seconds": 7.5,
+      "narration": "Upload harmless notes, ask for a Markdown action plan, then open the generated preview and correct the due date directly.",
+      "shot": "Show the harmless meeting-notes fixture, the real prompt, generated Markdown preview, and manual due-date edit."
+    },
+    {
+      "seconds": 8.0,
+      "narration": "Highlight one paragraph and ask Gemini to make it shorter. The edited file stays visible, so the result can be checked rather than politely imagined.",
+      "shot": "Highlight a paragraph, request a shorter version, and hold on the unedited real response including any failure state."
+    },
+    {
+      "seconds": 5.5,
+      "narration": "TXT and Markdown editing are web-only. Still, one fewer copy-paste ritual. We remain cautiously impressed.",
+      "shot": "Show before/after text and a concise web-only restriction card over owned footage."
+    }
+  ],
+  "required_real_demonstrations": [
+    "In a real authenticated Gemini web session, upload harmless fictional meeting notes, ask for a concise Markdown action plan, open the generated preview, manually correct one due date, highlight one paragraph and request a shorter version, then show the resulting file. Record the full interaction and any failure states."
+  ],
+  "availability": {
+    "status": "available",
+    "platforms": [
+      "Gemini web app for TXT, Markdown, documents, spreadsheets, slides and code",
+      "Gemini web and mobile for PDFs"
+    ],
+    "accounts_or_plans": [
+      "Google Workspace customers",
+      "Workspace Individual subscribers",
+      "personal Google accounts"
+    ],
+    "rollout": "Available now as of the official October 29, 2026 announcement, where the Gemini app is available.",
+    "restrictions": [
+      "Non-PDF formats are web-only",
+      "Regional and language availability follows Gemini app availability",
+      "Workspace administrators can disable Gemini app access"
+    ]
+  },
+  "claims": [
+    {
+      "text": "Gemini can generate, preview and edit supported files directly in app chat.",
+      "evidence_urls": [
+        "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+      ],
+      "confidence": "high"
+    },
+    {
+      "text": "PDF editing is supported on web and mobile; documents, spreadsheets, slides, Markdown, TXT and code are web-only.",
+      "evidence_urls": [
+        "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+      ],
+      "confidence": "high"
+    },
+    {
+      "text": "The announced availability includes Workspace customers, Workspace Individual subscribers and personal Google accounts.",
+      "evidence_urls": [
+        "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "unverified_claims_and_blockers": [
+    "Real product access and the proposed interaction have not been captured or verified.",
+    "No authenticated Gemini interaction was available in this execution environment, so the proposed workflow and output quality were not demonstrated.",
+    "The official announcement does not establish audience demand or quantify time saved.",
+    "Exact UI labels and behavior may vary by account, locale, rollout state or later product changes.",
+    "Human fact, rights, script, and final approvals remain incomplete."
+  ],
+  "access_and_licensing": {
+    "product_access": {
+      "status": "available",
+      "platforms": [
+        "Gemini web app for TXT, Markdown, documents, spreadsheets, slides and code",
+        "Gemini web and mobile for PDFs"
+      ],
+      "accounts_or_plans": [
+        "Google Workspace customers",
+        "Workspace Individual subscribers",
+        "personal Google accounts"
+      ],
+      "rollout": "Available now as of the official October 29, 2026 announcement, where the Gemini app is available.",
+      "restrictions": [
+        "Non-PDF formats are web-only",
+        "Regional and language availability follows Gemini app availability",
+        "Workspace administrators can disable Gemini app access"
+      ]
+    },
+    "capture_rights": "Operator must capture their own account and harmless data; product UI rights require human review."
+  },
+  "review": {
+    "facts_checked": false,
+    "demo_verified": false,
+    "assets_licensed": false,
+    "script_approved": false,
+    "final_approved": false
+  },
+  "publication_blocked": true,
+  "publication_blockers": [
+    "Real product access and the proposed interaction have not been captured or verified.",
+    "No authenticated Gemini interaction was available in this execution environment, so the proposed workflow and output quality were not demonstrated.",
+    "The official announcement does not establish audience demand or quantify time saved.",
+    "Exact UI labels and behavior may vary by account, locale, rollout state or later product changes.",
+    "Human fact, rights, script, and final approvals remain incomplete."
+  ]
+}
