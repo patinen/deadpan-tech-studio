@@ -190,6 +190,29 @@ pip install -r requirements.txt
 python studio.py build content/001-stop-copy-pasting.json --engine espeak
 ```
 
+## Research topic candidates
+
+Discover and rank evidence-linked candidates from the configured public feeds:
+
+```powershell
+python studio.py scout --limit 15
+```
+
+The command writes a new timestamped JSON report and readable Markdown report to
+`research/`. It does not execute demonstrations, invent popularity signals, create
+projects, or change review flags. Unavailable sources are reported and partial
+research is labelled `incomplete`.
+
+For a deterministic offline workflow test, use clearly labelled sample data:
+
+```powershell
+python studio.py scout --fixture --limit 12
+```
+
+Configure allowed feeds in `scout/sources.json` and ranking weights in
+`scout/weights.json`. See [docs/SCOUTING.md](docs/SCOUTING.md) for source behavior,
+scoring, costs, limitations, deduplication, and the manual verification workflow.
+
 ## Generate new video scripts using Gemini (optional)
 
 Copy `.env.example` to `.env`, add your API key, then run:
