@@ -1,9 +1,9 @@
 # Trend Scout
 
-Trend Scout gathers metadata from configured public RSS/Atom feeds, preserves the
-evidence link and date, and ranks possible Deadpan Tech topics. It is a research
-aid, not a popularity oracle: feed presence is not viewer demand, and a high score
-does not approve a claim or prove that a demonstration works.
+Trend Scout gathers metadata from configured public RSS/Atom feeds, preserves
+canonical article and feed URLs separately, classifies research material, and
+produces a shortlist of at most ten actionable opportunities. It is not a
+popularity oracle: source credibility and recency are not audience demand.
 
 ## Run it
 
@@ -11,9 +11,11 @@ does not approve a claim or prove that a demonstration works.
 python studio.py scout --limit 15
 ```
 
-Each run creates new timestamped JSON and Markdown files in `research/`; earlier
-runs are never overwritten. Generated reports are ignored by Git. To exercise the
-workflow without network access:
+Each run creates new timestamped JSON and Markdown archives in `research/`;
+earlier runs are never overwritten. JSON schema version 2 retains `proposals` for
+the actionable shortlist and adds `research_material` plus discovered,
+shortlisted, research-only, filtered, and rejected counts. Generated reports are
+ignored by Git. To exercise the workflow without network access:
 
 ```powershell
 python studio.py scout --fixture --limit 12
@@ -48,9 +50,34 @@ risk reduce the total. The normalized 0–100 result evaluates:
 - source confidence;
 - production effort and misleading-claim risk.
 
-The heuristic deliberately treats unavailable dates, product access, platform,
-version, pricing, and licensing as uncertainty. It never creates popularity
-metrics. Adjusted weights must be non-negative and use the documented dimensions.
+Production readiness now requires a concrete problem, visible demonstration and
+specific payoff. Evidence confidence and demand confidence are reported
+separately. Demand stays `unknown` unless independent evidence is supplied; feed
+presence never becomes a popularity score. Product news, opinion, roundups,
+maintenance releases and unsupported metadata remain in research-only material.
+
+## Optional assisted analysis
+
+An editor may use any LLM/provider outside the scout and supply a cached JSON file:
+
+```powershell
+python studio.py scout --analysis-file research/analysis.json --analysis-limit 10
+```
+
+This interface is provider-independent and makes no network model call itself.
+`--analysis-limit` bounds how many rows can be accepted, making cost control
+explicit. Every row must include a canonical `url`, one supported
+`editorial_category`, optional approved brief fields, and a `demand_evidence`
+list whose entries each contain a public URL and a bounded observation. Invalid
+categories or fields fail the run. Analysis can refine a brief but
+cannot replace, add, or invent source URLs. Empty demand evidence leaves demand
+unknown. This path is fully testable offline.
+
+Example shape:
+
+```json
+{"analyses":[{"url":"https://vendor.example/article","editorial_category":"tool demo","brief":{"hook":"Play the measured result first."},"demand_evidence":[]}]}
+```
 
 ## Editorial workflow
 
@@ -62,8 +89,10 @@ metrics. Adjusted weights must be non-negative and use the documented dimensions
 5. Manually create a content project. Scouting never generates, approves, renders,
    or publishes a video.
 
-Known limitations: feeds are a narrow discovery surface, dates may describe a feed
-update rather than feature launch, metadata summaries can omit restrictions, and
-the keyword heuristic cannot measure actual demand. Community sources should only
-be added when their public access rules allow automated feed retrieval; community
-claims need corroboration from authoritative documentation.
+Known limitations: feeds are a narrow discovery surface, classification is a
+conservative metadata heuristic, summaries can omit restrictions, and no system
+here measures demand. Canonicalization removes known tracking parameters but does
+not follow redirects. The allow-list includes official vendor sources and one
+reputable independent technology publication; independent coverage is discovery,
+not proof of popularity. Community feeds should only be added when their access
+rules permit it, and community claims need authoritative corroboration.

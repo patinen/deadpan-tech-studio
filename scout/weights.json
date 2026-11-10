@@ -1,12 +1,13 @@
 {
   "weights": {
-    "problem_strength": 1.4,
-    "audience_breadth": 1.5,
-    "visual_hook": 1.2,
-    "practical_usefulness": 1.5,
-    "current_relevance": 0.8,
-    "demo_feasibility": 1.3,
-    "source_confidence": 1.2,
+    "problem_strength": 1.5,
+    "audience_breadth": 1.2,
+    "visual_demo": 1.5,
+    "specific_payoff": 1.5,
+    "practical_usefulness": 1.3,
+    "current_relevance": 0.5,
+    "demo_feasibility": 1.2,
+    "source_confidence": 0.7,
     "production_effort": 0.8,
     "misleading_risk": 1.3
   }
