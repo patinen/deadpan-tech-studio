@@ -12,3 +12,4 @@ models/*.onnx.json
 debug.log
 research/*.json
 research/*.md
+diagnostics/

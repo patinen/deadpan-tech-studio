@@ -18,7 +18,8 @@ from studio.visual_qa import generate_contact_sheet
 from studio.recipe_capture import capture_recipe
 from studio.scout import run_scout
 from studio.editorial import (build_production_brief, fetch_article, gemini_analyze,
-                              load_fixture, save_brief, select_candidate)
+                              load_fixture, replay_model_response, save_brief,
+                              select_candidate)
 
 
 def load_env():
@@ -56,6 +57,9 @@ def main():
     d.add_argument("--model", default=None)
     d.add_argument("--output", required=True)
     d.add_argument("--promote", action="store_true", help="Archive and replace the same-topic draft as a new unapproved revision")
+    replay = sub.add_parser("replay-editorial", help="Revalidate saved Gemini editorial JSON without an API call")
+    replay.add_argument("response")
+    replay.add_argument("--source", action="append", required=True, help="Allowed evidence URL (repeatable)")
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -137,6 +141,10 @@ def main():
             print("Publication blocked:", brief["publication_blocked"])
             for blocker in brief["publication_blockers"]:
                 print("BLOCKER:", blocker)
+            return 0
+        if args.cmd == "replay-editorial":
+            replay_model_response(Path(args.response).resolve(), args.source)
+            print("Editorial response is valid for the supplied evidence URLs.")
             return 0
         path = Path(args.project).resolve()
         project = load_project(path)

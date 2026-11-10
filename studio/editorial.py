@@ -5,6 +5,9 @@ import json
 import math
 import os
 import re
+import time
+from copy import deepcopy
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin, urlparse, urlunparse
@@ -19,6 +22,63 @@ REQUIRED = {"classification", "accepted", "rejection_reason", "actual_feature", 
             "realistic_benefit", "target_audience", "visual_demonstration", "opening_hook",
             "availability", "claims", "uncertainties", "sources", "script", "shot_plan"}
 HTTPS_UPGRADE_HOSTS = {"workspaceupdates.googleblog.com"}
+EDITORIAL_RESPONSE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "classification": {"type": "string", "enum": sorted(CLASSIFICATIONS)},
+        "accepted": {"type": "boolean"},
+        "rejection_reason": {"type": "string", "description": "Empty string when accepted; concrete reason when rejected."},
+        "actual_feature": {"type": "string"},
+        "viewer_problem": {"type": "string"},
+        "realistic_benefit": {"type": "string"},
+        "target_audience": {"type": "string"},
+        "visual_demonstration": {"type": "string"},
+        "opening_hook": {"type": "string"},
+        "availability": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "status": {"type": "string", "enum": ["available", "limited", "unavailable", "unknown"]},
+                "platforms": {"type": "array", "items": {"type": "string"}},
+                "accounts_or_plans": {"type": "array", "items": {"type": "string"}},
+                "rollout": {"type": "string"},
+                "restrictions": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["status", "platforms", "accounts_or_plans", "rollout", "restrictions"],
+        },
+        "claims": {
+            "type": "array", "minItems": 1,
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "properties": {
+                    "text": {"type": "string"},
+                    "evidence_urls": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                    "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                },
+                "required": ["text", "evidence_urls", "confidence"],
+            },
+        },
+        "uncertainties": {"type": "array", "description": "Known unknowns only; use an empty array when none.",
+                          "items": {"type": "string"}},
+        "sources": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "script": {"type": "array", "minItems": 3, "maxItems": 6,
+                   "description": "Complete narration in 3–6 lines and 45–85 total words.",
+                   "items": {"type": "string"}},
+        "shot_plan": {
+            "type": "array", "minItems": 3, "maxItems": 6,
+            "description": "One shot per script line; all seconds total 20–30.",
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "properties": {
+                    "seconds": {"type": "number", "minimum": 0.1, "maximum": 30},
+                    "shot": {"type": "string"},
+                },
+                "required": ["seconds", "shot"],
+            },
+        },
+    },
+    "required": sorted(REQUIRED),
+}
 
 
 class EditorialError(RuntimeError):
@@ -102,12 +162,37 @@ def _model_text(data: dict) -> str:
         raise EditorialError("Gemini returned no editorial JSON") from exc
 
 
+def save_model_diagnostic(raw_text: str, *, model: str, error: str,
+                          directory: Path | None = None) -> Path:
+    """Persist only model output and validation context; never request headers or keys."""
+    directory = directory or ROOT / "diagnostics" / "editorial"
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    path = directory / f"gemini-editorial-{stamp}.json"
+    path.write_text(json.dumps({"version": 1, "model": model, "error": error,
+                                "raw_model_output": raw_text}, indent=2,
+                               ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def _normalize_trivial_representations(value: dict) -> dict:
+    """Normalize only representations whose meaning is unambiguous."""
+    output = deepcopy(value)
+    if output.get("accepted") is True and output.get("rejection_reason") is None:
+        output["rejection_reason"] = ""
+    availability = output.get("availability")
+    if isinstance(availability, dict) and "restrictions" in availability and availability["restrictions"] is None:
+        availability["restrictions"] = []
+    return output
+
+
 def gemini_analyze(candidate: dict, article: dict, *, model: str | None = None,
-                   requester=requests.post) -> dict:
+                   requester=requests.post, max_retries: int = 2,
+                   sleep_fn=time.sleep, diagnostic_dir: Path | None = None) -> dict:
     key = os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         raise EditorialError("Set GEMINI_API_KEY to use --ai; use --fixture for offline validation")
-    model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     prompt = (ROOT / "prompts" / "editorial_analysis.md").read_text(encoding="utf-8")
     allowed = [canonicalize_url(article["url"])]
     request_text = (f"CANDIDATE:\n{json.dumps(candidate, ensure_ascii=False)}\n\n"
@@ -116,23 +201,65 @@ def gemini_analyze(candidate: dict, article: dict, *, model: str | None = None,
     payload = {"system_instruction": {"parts": [{"text": prompt}]},
                "contents": [{"role": "user", "parts": [{"text": request_text}]}],
                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 4096,
-                                    "responseMimeType": "application/json"}}
+                                    "responseMimeType": "application/json",
+                                    "responseJsonSchema": EDITORIAL_RESPONSE_SCHEMA}}
+    response = None
+    for attempt in range(max_retries + 1):
+        try:
+            response = requester(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                                 headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+                                 json=payload, timeout=90)
+            if response.status_code not in {429, 500, 503}:
+                response.raise_for_status()
+                break
+            if attempt == max_retries:
+                response.raise_for_status()
+        except requests.RequestException as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status in {429, 500, 503} and attempt < max_retries:
+                sleep_fn(2 ** attempt)
+                continue
+            raise EditorialError(f"Gemini editorial analysis failed after {attempt + 1} attempt(s): {exc}") from exc
+        sleep_fn(2 ** attempt)
     try:
-        response = requester(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                             headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                             json=payload, timeout=90)
-        response.raise_for_status()
-        output = json.loads(_model_text(response.json()))
-    except requests.RequestException as exc:
-        raise EditorialError(f"Gemini editorial analysis failed: {exc}") from exc
+        raw_text = _model_text(response.json())
+    except (ValueError, EditorialError) as exc:
+        raise EditorialError(f"Gemini returned no readable editorial response: {exc}") from exc
+    try:
+        output = json.loads(raw_text)
     except json.JSONDecodeError as exc:
-        raise EditorialError("Gemini returned malformed editorial JSON") from exc
-    return validate_analysis(output, allowed)
+        diagnostic = save_model_diagnostic(raw_text, model=model, error="Malformed JSON",
+                                           directory=diagnostic_dir)
+        raise EditorialError(f"Gemini returned malformed editorial JSON; saved diagnostic: {diagnostic}") from exc
+    try:
+        return validate_analysis(output, allowed)
+    except EditorialError as exc:
+        diagnostic = save_model_diagnostic(raw_text, model=model, error=str(exc),
+                                           directory=diagnostic_dir)
+        raise EditorialError(f"Gemini editorial schema error: {exc}; saved diagnostic: {diagnostic}") from exc
+
+
+def replay_model_response(path: Path, allowed_urls: list[str]) -> dict:
+    """Validate a saved diagnostic or raw analysis without calling any provider."""
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise EditorialError(f"Replay file is not valid JSON: {path}") from exc
+    raw = saved.get("raw_model_output") if isinstance(saved, dict) else None
+    if raw is not None:
+        if not isinstance(raw, str):
+            raise EditorialError("Replay diagnostic raw_model_output must be a string")
+        try:
+            saved = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise EditorialError("Replay model output is malformed JSON") from exc
+    return validate_analysis(saved, allowed_urls)
 
 
 def validate_analysis(value: dict, allowed_urls: list[str]) -> dict:
     if not isinstance(value, dict):
         raise EditorialError("Editorial analysis root must be a JSON object")
+    value = _normalize_trivial_representations(value)
     if not REQUIRED.issubset(value):
         raise EditorialError(f"Editorial analysis is missing fields: {sorted(REQUIRED - set(value))}")
     if (not isinstance(value["classification"], str) or value["classification"] not in CLASSIFICATIONS

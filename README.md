@@ -226,6 +226,15 @@ python studio.py develop --report research/scout-latest.json `
 The analyzer reads the actual canonical article, requires evidence URLs for every
 claim, rejects unsuitable topics, and validates a 20–30 second script and shot
 plan. It never verifies a product demonstration merely by reading an article.
+Gemini requests use an explicit structured-output schema; `gemini-3.5-flash-lite`
+is the configurable default in `.env.example`. Transient 429/500/503 responses
+receive at most two retries. Invalid model output is stored without credentials
+under ignored `diagnostics/editorial/` and can be replayed offline:
+
+```powershell
+python studio.py replay-editorial diagnostics/editorial/response.json `
+  --source https://example.com/allowed-evidence
+```
 Known legacy Google Workspace `http://` article URLs are upgraded to HTTPS and
 must return valid HTML; other HTTP sources and cross-host redirects are rejected.
 

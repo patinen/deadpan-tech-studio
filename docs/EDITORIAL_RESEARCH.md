@@ -17,9 +17,35 @@ python studio.py develop `
 ```
 
 `--ai` requires `GEMINI_API_KEY`; `GEMINI_MODEL` or `--model` selects the model.
+The documented default is `gemini-3.5-flash-lite`, which supports structured
+outputs on Gemini's `generateContent` API.
 One command analyzes one candidate, the request has a 4,096-token output cap, and
 temperature is fixed at 0.2. Provider errors and malformed responses stop the run.
 No key is logged or written. There is no batch mode or uncapped analysis loop.
+
+The request supplies a complete JSON Schema through
+`generationConfig.responseJsonSchema` as well as the JSON MIME type. The schema
+defines required fields, classification/status/confidence enums, string-only
+arrays, cited-claim objects, and numeric shot durations. Local semantic validation
+still runs after generation; structured output is not treated as fact checking.
+
+HTTP 429, 500, and 503 responses receive at most two retries after one- and
+two-second delays. Other API errors and schema failures are not retried. If JSON
+parsing or validation fails, the raw model text, model name, and field-specific
+error are written under ignored `diagnostics/editorial/`. Request headers and API
+keys are never included.
+
+Revalidate a diagnostic or raw analysis without another API call:
+
+```powershell
+python studio.py replay-editorial diagnostics/editorial/gemini-editorial-....json `
+  --source https://example.com/the-allowed-evidence-page
+```
+
+Only two representation differences are normalized: an accepted response may use
+`null` for `rejection_reason` (treated as `""`), and an explicitly present `null`
+restrictions value is treated as `[]`. Missing fields, objects in place of arrays,
+and unsupported factual structures remain errors.
 
 Legacy Scout archives may contain `http://workspaceupdates.googleblog.com`
 article links. That recognized host is upgraded before the request, and the HTTPS

@@ -14,7 +14,7 @@ def create_script(idea: str, *, model: str | None = None, sources: list[str] | N
     key = os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         raise RuntimeError("Set GEMINI_API_KEY in your environment or .env file")
-    model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     system = (ROOT / "prompts" / "script_system.md").read_text(encoding="utf-8")
     voice = (ROOT / "prompts" / "brand_voice.md").read_text(encoding="utf-8")
     supplied = "\n".join(sources or []) or "No verified sources supplied. Don't invent any."
