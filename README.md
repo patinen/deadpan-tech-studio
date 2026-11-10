@@ -264,6 +264,35 @@ topics remain errors.
 See [docs/EDITORIAL_RESEARCH.md](docs/EDITORIAL_RESEARCH.md) for offline fixtures,
 cost controls, validation rules, and publication blockers.
 
+## Convert an editorial brief into a production project
+
+Evaluate the brief, create a new unapproved project, and confirm that strict
+publication review remains blocked:
+
+```powershell
+python studio.py editorial-check editorial/006-gemini-file-editing.json
+python studio.py convert-editorial editorial/006-gemini-file-editing.json `
+  content/006-gemini-file-editing.json --project-id 006-gemini-file-editing
+python studio.py review content/006-gemini-file-editing.json --strict
+```
+
+The conversion carries sources, claims, narration, timing, restrictions,
+warnings, and review state into editable scenes. It does not invent media paths
+or approvals. Import a genuine operator-owned recording for a mapped shot with:
+
+```powershell
+python studio.py intake-demo content/006-gemini-file-editing.json `
+  shot-01 C:\captures\result.mp4 --start 1.2 --duration 6 `
+  --zoom 1.25 --focus-x 0.55 --focus-y 0.45
+```
+
+The source recording is preserved, a copy plus traceability metadata is stored
+locally, and demonstration/licensing approvals stay false. Missing recordings
+can be rendered only as visibly labelled draft placeholders. See
+[docs/PRODUCTION_BRIDGE.md](docs/PRODUCTION_BRIDGE.md) for the harmless Gemini
+test-data workflow, required authenticated-session clips, validation rules, and
+remaining human review steps.
+
 ## Generate new video scripts using Gemini (optional)
 
 Copy `.env.example` to `.env`, add your API key, then run:
@@ -300,6 +329,10 @@ Do **not** automatically upload drafts. Only when a human has checked the facts,
 ```json
 "review": { "facts_checked": true, "assets_licensed": true, "final_approved": true }
 ```
+
+Editorial-conversion projects additionally require `script_approved`,
+`demo_verified`, and `creative_approved`. The bridge initializes every flag to
+false, and footage intake resets relevant approvals; it never auto-approves.
 
 Check `python studio.py review content/your-video.json --strict` before publication. Draft renders are marked as drafts. Review flags are assertions by the operator, not actual automated content moderation.
 

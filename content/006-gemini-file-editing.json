@@ -1,0 +1,183 @@
+{
+  "id": "006-gemini-file-editing",
+  "title": "Create, preview, and edit files directly in the Gemini app",
+  "description": "Generate, preview, and edit files and code directly inside your Gemini app chat without switching apps.",
+  "hook": "Generate files directly inside the Gemini app chat instead of switching windows.",
+  "sources": [
+    "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+  ],
+  "production": {
+    "preset": "production",
+    "source_brief": "editorial/006-gemini-file-editing.json",
+    "authentic_demo": {
+      "required": true,
+      "shot_ids": [
+        "shot-01",
+        "shot-02",
+        "shot-03"
+      ]
+    }
+  },
+  "scenes": [
+    {
+      "id": "shot-01",
+      "kind": "hook",
+      "headline": "SHOW THE RESULT FIRST",
+      "narration": "Generate files directly inside the Gemini app chat instead of switching windows.",
+      "caption": "Generate files directly inside the Gemini app chat instead of switching windows.",
+      "asset": null,
+      "duration": 8.0,
+      "visual": {
+        "layout": "focus",
+        "placeholder": "AUTHENTIC RECORDING REQUIRED"
+      },
+      "edit": {
+        "asset_start": 0.0,
+        "zoom": 1.0,
+        "focus_x": 0.5,
+        "focus_y": 0.5
+      },
+      "editorial_shot": "Screen recording showing a user typing a prompt to generate a document inside the Gemini app chat."
+    },
+    {
+      "id": "shot-02",
+      "kind": "demo",
+      "headline": "PREVIEW YOUR GENERATED SLIDES SHEETS OR",
+      "narration": "Preview your generated slides, sheets, or documents right within the conversation interface.",
+      "caption": "Preview your generated slides, sheets, or documents right within the conversatio",
+      "asset": null,
+      "duration": 10.0,
+      "visual": {
+        "layout": "focus_alt",
+        "placeholder": "AUTHENTIC RECORDING REQUIRED"
+      },
+      "edit": {
+        "asset_start": 0.0,
+        "zoom": 1.0,
+        "focus_x": 0.5,
+        "focus_y": 0.5
+      },
+      "editorial_shot": "Close-up of the inline preview pane displaying the generated file layout within the chat."
+    },
+    {
+      "id": "shot-03",
+      "kind": "payoff",
+      "headline": "VERIFY THE PAYOFF",
+      "narration": "Expand to full screen to edit text directly or ask Gemini to refine your work.",
+      "caption": "Expand to full screen to edit text directly or ask Gemini to refine your work.",
+      "asset": null,
+      "duration": 7.0,
+      "visual": {
+        "layout": "browser_demo",
+        "placeholder": "AUTHENTIC RECORDING REQUIRED"
+      },
+      "edit": {
+        "asset_start": 0.0,
+        "zoom": 1.0,
+        "focus_x": 0.5,
+        "focus_y": 0.5
+      },
+      "editorial_shot": "Expanding the view to full screen and editing text directly inside the interface."
+    }
+  ],
+  "claims": [
+    {
+      "text": "You can now generate, preview, and edit files right within your Gemini app chat—expand to full screen to type edits directly, highlight text to ask questions, or have Gemini refine them.",
+      "evidence_urls": [
+        "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+      ],
+      "confidence": "high"
+    },
+    {
+      "text": "PDF preview and editing is supported on both the web and mobile, while all other formats are supported on the web only.",
+      "evidence_urls": [
+        "https://workspaceupdates.googleblog.com/2026/10/create-preview-and-edit-files-directly-in-the-Gemini-app.html"
+      ],
+      "confidence": "high"
+    }
+  ],
+  "editorial": {
+    "quality_gate": {
+      "factual_validity": {
+        "score": 100,
+        "status": "pass",
+        "reasons": []
+      },
+      "production_readiness": {
+        "score": 56,
+        "status": "blocked",
+        "reasons": [
+          "Shots [1, 2] are long static holds unless real interaction proves otherwise.",
+          "The real product demonstration is not verified."
+        ]
+      },
+      "creative_quality": {
+        "score": 56,
+        "status": "human_review_required",
+        "reasons": [
+          "The opening repeats a product feature instead of showing a specific result or frustration.",
+          "The viewer problem is generic and does not identify a recognizable task or consequence."
+        ]
+      },
+      "revision_suggestions": [
+        "Split long shots around visible cursor actions, edits, and result changes.",
+        "Open on the harmless finished file and name the concrete task it fixes.",
+        "Name the exact before-state, such as copying rough meeting notes into a second editor."
+      ],
+      "human_creative_approval_required": true
+    },
+    "warnings": [
+      "Script is 39 words over 25 seconds; the preferred editorial target is 45–85 words. Human pacing and completeness review is required."
+    ],
+    "required_real_demonstrations": [
+      "Prompt Gemini to generate a slide deck or sheet, preview it inside the chat interface, and expand to edit text directly."
+    ],
+    "availability": {
+      "status": "available",
+      "platforms": [
+        "web",
+        "mobile"
+      ],
+      "accounts_or_plans": [
+        "Google Workspace customers",
+        "Workspace Individual subscribers",
+        "personal Google accounts"
+      ],
+      "rollout": "Rapid Release and Scheduled Release domains: Available now",
+      "restrictions": [
+        "PDF preview and editing supported on web and mobile",
+        "all other formats supported on web only"
+      ]
+    },
+    "publication_blocked": true,
+    "publication_blockers": [
+      "Real product access and the proposed interaction have not been captured or verified.",
+      "Editorial warning: Script is 39 words over 25 seconds; the preferred editorial target is 45–85 words. Human pacing and completeness review is required.",
+      "Human fact, rights, script, and final approvals remain incomplete.",
+      "Promoted revision requires fresh human review.",
+      "The opening repeats a product feature instead of showing a specific result or frustration.",
+      "The viewer problem is generic and does not identify a recognizable task or consequence.",
+      "Converted project requires human creative approval and verified operator-owned footage."
+    ],
+    "demo_intake": {},
+    "conversion_warnings": [
+      "Human review pending: facts_checked",
+      "Human review pending: assets_licensed",
+      "Human review pending: final_approved",
+      "Human review pending: script_approved",
+      "Human review pending: demo_verified",
+      "Human review pending: creative_approved",
+      "No real footage/screenshots added: draft preview only",
+      "Authentic editorial footage missing for: shot-01, shot-02, shot-03; placeholder draft only",
+      "Imported footage has not been human-verified against the editorial demonstration"
+    ]
+  },
+  "review": {
+    "facts_checked": false,
+    "assets_licensed": false,
+    "script_approved": false,
+    "demo_verified": false,
+    "creative_approved": false,
+    "final_approved": false
+  }
+}

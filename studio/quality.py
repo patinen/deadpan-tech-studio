@@ -8,6 +8,18 @@ HYPE = ("revolutionary", "game-changing", "insane ai", "100% guaranteed", "unbel
 VALID_KINDS = {"hook", "problem", "demo", "payoff", "explain", "comparison"}
 
 
+def publication_review_keys(project: dict) -> tuple[str, ...]:
+    base = ("facts_checked", "assets_licensed", "final_approved")
+    if project.get("editorial") or project.get("production", {}).get("authentic_demo"):
+        return base + ("script_approved", "demo_verified", "creative_approved")
+    return base
+
+
+def is_publication_approved(project: dict) -> bool:
+    review = project.get("review", {})
+    return all(review.get(key) is True for key in publication_review_keys(project))
+
+
 def check(project: dict, require_approval: bool = False) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -66,7 +78,7 @@ def check(project: dict, require_approval: bool = False) -> tuple[list[str], lis
             urlparse(url).scheme not in {"https", "http"} for url in sources):
         errors.append("sources must be an array of full http(s) URLs")
     review = project.get("review", {})
-    for key in ("facts_checked", "assets_licensed", "final_approved"):
+    for key in publication_review_keys(project):
         if not review.get(key, False):
             warnings.append(f"Human review pending: {key}")
             if require_approval:
@@ -94,4 +106,25 @@ def check(project: dict, require_approval: bool = False) -> tuple[list[str], lis
             warnings.append("Verified recipe capture is missing: run studio.py capture <project>")
         else:
             warnings.append("Verified recipe capture exists; human must still verify actions and framing")
+    authentic = project.get("production", {}).get("authentic_demo")
+    if isinstance(authentic, dict) and authentic.get("required"):
+        required = set(authentic.get("shot_ids", []))
+        by_id = {scene.get("id"): scene for scene in scenes if isinstance(scene, dict)}
+        intake = project.get("editorial", {}).get("demo_intake", {})
+        missing_footage = []
+        for shot_id in required:
+            scene = by_id.get(shot_id, {})
+            asset = scene.get("asset")
+            path = Path(asset) if asset else None
+            if path and not path.is_absolute():
+                path = ROOT / path
+            if not asset or not path.is_file() or shot_id not in intake:
+                missing_footage.append(shot_id)
+        if missing_footage:
+            message = "Authentic editorial footage missing for: " + ", ".join(sorted(missing_footage))
+            warnings.append(message + "; placeholder draft only")
+            if require_approval:
+                errors.append(message)
+        if not project.get("review", {}).get("demo_verified"):
+            warnings.append("Imported footage has not been human-verified against the editorial demonstration")
     return errors, warnings

@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from .graphics import FOCUS_LAYOUTS, PANEL, W, H, build_frame, paste_still, scene_panel
 from .subtitles import load_or_create_manifest, write_ass, write_callouts_ass
-from .quality import check
+from .quality import check, is_publication_approved
 from .utils import ROOT, assert_tool, duration_seconds, run, slugify
 
 STILL_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -92,7 +92,7 @@ def render(project: dict, project_file: Path, output: Path | None = None, *,
     work.mkdir(parents=True, exist_ok=True)
     output = output or ROOT / "output" / f"{slug}.mp4"
     output.parent.mkdir(parents=True, exist_ok=True)
-    approved = bool(project.get("review", {}).get("final_approved"))
+    approved = is_publication_approved(project)
     warnings = []
     scene_files: list[Path] = []
     actual_times, subtitle_times, voices = [], [], []
