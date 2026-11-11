@@ -20,6 +20,8 @@ from studio.scout import run_scout
 from studio.editorial import (build_production_brief, fetch_article, gemini_analyze,
                               load_fixture, replay_model_response, save_brief,
                               select_candidate)
+from studio.production_bridge import (convert_brief, evaluate_editorial,
+                                      intake_recording, save_project)
 
 
 def load_env():
@@ -62,6 +64,21 @@ def main():
     replay = sub.add_parser("replay-editorial", help="Revalidate saved Gemini editorial JSON without an API call")
     replay.add_argument("response")
     replay.add_argument("--source", action="append", required=True, help="Allowed evidence URL (repeatable)")
+    eq = sub.add_parser("editorial-check", help="Evaluate factual, production, and creative editorial readiness")
+    eq.add_argument("brief")
+    convert = sub.add_parser("convert-editorial", help="Convert an editorial brief to an unapproved content project")
+    convert.add_argument("brief")
+    convert.add_argument("output")
+    convert.add_argument("--project-id", default=None)
+    intake = sub.add_parser("intake-demo", help="Import operator-owned footage for one editorial shot")
+    intake.add_argument("project")
+    intake.add_argument("shot")
+    intake.add_argument("media")
+    intake.add_argument("--start", type=float, default=0.0)
+    intake.add_argument("--duration", type=float, default=None)
+    intake.add_argument("--zoom", type=float, default=1.0)
+    intake.add_argument("--focus-x", type=float, default=0.5)
+    intake.add_argument("--focus-y", type=float, default=0.5)
     q = sub.add_parser("review", help="Quality checks; --strict checks publication approval")
     q.add_argument("project")
     q.add_argument("--strict", action="store_true")
@@ -165,6 +182,31 @@ def main():
             replay_model_response(Path(args.response).resolve(), args.source)
             print("Editorial response is valid for the supplied evidence URLs.")
             return 0
+        if args.cmd == "editorial-check":
+            brief = json.loads(Path(args.brief).resolve().read_text(encoding="utf-8"))
+            print(json.dumps(evaluate_editorial(brief), indent=2, ensure_ascii=False))
+            return 0
+        if args.cmd == "convert-editorial":
+            brief_path = Path(args.brief).resolve()
+            brief = json.loads(brief_path.read_text(encoding="utf-8"))
+            source_brief = (brief_path.relative_to(ROOT).as_posix()
+                            if ROOT in brief_path.parents else str(brief_path))
+            project = convert_brief(brief, project_id=args.project_id,
+                                    source_brief=source_brief)
+            output = save_project(project, Path(args.output).resolve())
+            print("Unapproved content project:", output)
+            for warning in project["editorial"]["conversion_warnings"]:
+                print("WARNING:", warning)
+            return 0
+        if args.cmd == "intake-demo":
+            evidence = intake_recording(Path(args.project).resolve(), args.shot,
+                                        Path(args.media).resolve(), start=args.start,
+                                        duration=args.duration, zoom=args.zoom,
+                                        focus_x=args.focus_x, focus_y=args.focus_y)
+            print("Imported authentic footage:", evidence["imported_asset"])
+            print("SHA256:", evidence["sha256"])
+            print("Human demo verification remains false.")
+            return 0
         path = Path(args.project).resolve()
         project = load_project(path)
         errors, warnings = check(project, require_approval=args.cmd == "review" and args.strict)
@@ -208,7 +250,7 @@ def main():
             print(f"Rendered: {output} ({output.stat().st_size / 1024 / 1024:.1f} MB)")
             for warning in render_warnings:
                 print("WARNING:", warning)
-            print("This is a DRAFT until facts, footage rights, and final quality are approved.")
+            print("This is a DRAFT until the quality report has no blockers and every required human approval is complete.")
         return 0
     except (ValueError, FileNotFoundError, RuntimeError, KeyError) as exc:
         print("ERROR:", exc, file=sys.stderr)

@@ -13,3 +13,4 @@ debug.log
 research/*.json
 research/*.md
 diagnostics/
+assets/imported/

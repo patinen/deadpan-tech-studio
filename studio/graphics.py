@@ -179,6 +179,17 @@ def build_frame(scene: dict, number: int, count: int, brand: str | None = None,
         panel = scene_panel(scene)
         d.rounded_rectangle(panel, radius=18, fill=(18, 23, 30),
                             outline=(75, 88, 80), width=2)
+        if not has_video:
+            x1, y1, x2, y2 = panel
+            label = scene.get("visual", {}).get("placeholder", "AUTHENTIC RECORDING REQUIRED")
+            label = str(label).upper()
+            d.rounded_rectangle((x1 + 30, (y1 + y2) // 2 - 54,
+                                 x2 - 30, (y1 + y2) // 2 + 54),
+                                radius=14, fill=(27, 34, 42), outline=CORAL, width=2)
+            d.text((x1 + 48, (y1 + y2) // 2 - 30), "MISSING REAL FOOTAGE",
+                   font=font(17, True), fill=CORAL)
+            text_lines(d, (x1 + 48, (y1 + y2) // 2 + 4), label,
+                       font(13, True), MUTED, x2 - x1 - 96, max_lines=2)
         d.line((24, 885, 516, 885), fill=(67, 75, 72), width=2)
         status = "DRAFT · NOT APPROVED" if draft else "ORIGINAL TECH EXPLAINERS"
         d.text((24, 902), status, font=font(13, True), fill=CORAL if draft else MUTED)
